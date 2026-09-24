@@ -24,7 +24,46 @@ function closeModal(){document.getElementById('modalRoot').classList.remove('sho
 function modal(html){document.getElementById('modalBody').innerHTML=html;document.getElementById('modalRoot').classList.add('show')}
 const opts=(a,v,l,sel)=>a.map(x=>'<option value="'+esc(x[v])+'"'+(x[v]==sel?' selected':'')+'>'+esc(l(x))+'</option>').join('');
 
+function authInviteState(){
+ const hash=new URLSearchParams(location.hash.replace(/^#/,''));
+ const type=hash.get('type');
+ const error=hash.get('error');
+ const errorCode=hash.get('error_code');
+ const description=hash.get('error_description');
+ if(error||errorCode)return {error, errorCode, description:description?decodeURIComponent(description):''};
+ return {type};
+}
+async function invitationSetup(){
+ const s=authInviteState();
+ if(s.error||s.errorCode){
+  app.innerHTML='<div class="loginwrap"><div class="card lg"><div class="hero card" style="margin:-16px -16px 16px;border:0"><h1 style="margin:0">I2School</h1><div class="mu">Activation du compte</div></div><h2>Lien d’invitation invalide ou expiré</h2><p class="mu">'+esc(s.description||'Le lien utilisé n’est plus valide.')+'</p><p class="mu">Demandez à l’administration de vous envoyer une nouvelle invitation.</p><button class="p" style="width:100%" onclick="location.hash='';location.reload()">Retour à la connexion</button></div></div>';
+  return true;
+ }
+ if(s.type!=='invite')return false;
+ const {data:{session},error}=await sb.auth.getSession();
+ if(error||!session){
+  app.innerHTML='<div class="loginwrap"><div class="card lg"><h2>Activation du compte</h2><p class="mu">La session d’invitation n’est pas disponible. Ouvrez le lien reçu dans votre e-mail.</p></div></div>';
+  return true;
+ }
+ app.innerHTML='<div class="loginwrap"><div class="card lg"><div class="hero card" style="margin:-16px -16px 16px;border:0"><h1 style="margin:0">I2School</h1><div class="mu">Activation de votre compte</div></div><h2>Créez votre mot de passe</h2><p class="mu">Choisissez le mot de passe qui vous servira à vous connecter à I2School.</p><div class="field"><label>Mot de passe *</label><input id="invitePw" type="password" autocomplete="new-password" minlength="8"></div><div class="field"><label>Confirmer le mot de passe *</label><input id="invitePw2" type="password" autocomplete="new-password" minlength="8"></div><button class="p" id="activateBtn" style="width:100%">Activer mon compte</button><p id="inviteMsg" class="mu" style="margin-top:10px"></p></div></div>';
+ const activate=async()=>{
+  const p=invitePw.value,p2=invitePw2.value;
+  if(p.length<8)return toast('Le mot de passe doit contenir au moins 8 caractères.',true);
+  if(p!==p2)return toast('Les deux mots de passe ne correspondent pas.',true);
+  activateBtn.disabled=true;
+  const {error}=await sb.auth.updateUser({password:p});
+  activateBtn.disabled=false;
+  if(error){toast(error.message||'Activation impossible',true);return}
+  history.replaceState({},document.title,location.pathname+location.search);
+  toast('Compte activé. Bienvenue sur I2School.');
+  setTimeout(()=>boot(),400);
+ };
+ activateBtn.onclick=activate;
+ invitePw2.onkeydown=e=>{if(e.key==='Enter')activate()};
+ return true;
+}
 async function boot(){
+ if(await invitationSetup())return;
  const {data:{session}}=await sb.auth.getSession();if(!session)return login();
  const {data:me,error}=await sb.from('profiles').select('*').eq('auth_user_id',session.user.id).maybeSingle();
  if(error||!me){app.innerHTML='<main><div class="card">Profil introuvable pour ce compte.</div></main>';return}
