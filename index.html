@@ -1,131 +1,173 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>I2School – Lycée Mikolongo</title>
+<title>I2School — Anglais</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-:root{--bg:#f5f7f6;--card:#fff;--tx:#17211c;--mu:#66766d;--ac:#0b7a4b;--bd:#dfe6e2;--er:#b3261e}
-@media(prefers-color-scheme:dark){:root{--bg:#111815;--card:#1a231f;--tx:#e8efeb;--mu:#93a39a;--ac:#3fbf85;--bd:#2b3832;--er:#f2827b}}
-*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:var(--bg);color:var(--tx)}
-header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--bd)}
-nav{display:flex;flex-wrap:wrap;gap:4px}nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
-main{max-width:1000px;margin:0 auto;padding:16px}
-button,select,input{font:inherit;padding:7px 12px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--tx)}
-button{cursor:pointer}button.p{background:var(--ac);color:#fff;border-color:var(--ac)}button:disabled{opacity:.5;cursor:default}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.k{font-size:28px;font-weight:700;color:var(--ac)}.mu{color:var(--mu);font-size:13px}
-.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}.sc{overflow-x:auto}
-table{border-collapse:collapse;width:100%}th,td{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{font-size:12px;color:var(--mu)}
-tr.cl{cursor:pointer}tr.cl:hover{background:var(--bg)}td input[type=number]{width:80px}
-.tag{padding:2px 8px;border-radius:99px;background:var(--bg);border:1px solid var(--bd);font-size:12px}
-#t{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ac);color:#fff;padding:10px 16px;border-radius:10px;z-index:9}#t.bad{background:var(--er)}
-.lg{max-width:340px;margin:12vh auto}.lg input{width:100%;margin:6px 0}
-@media print{header,.bar,#t,.np{display:none!important}}
-</style></head><body><div id="app"></div><div id="t" hidden></div>
+:root{--bg:#f4f7f5;--card:#fff;--tx:#15201a;--mu:#68766e;--ac:#087a4b;--ac2:#0d5f8c;--yl:#e8b923;--bd:#dce5df;--ok:#18794e;--er:#b3261e;--sh:0 8px 28px #173b2b10}
+*{box-sizing:border-box}body{margin:0;font:15px system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--tx)}
+button,input,select,textarea{font:inherit;border:1px solid var(--bd);border-radius:9px;background:var(--card);color:var(--tx);padding:9px 11px}button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color:white}button.b{background:var(--ac2);border-color:var(--ac2);color:white}button.d{color:var(--er)}button:disabled{opacity:.5;cursor:not-allowed}
+header{position:sticky;top:0;z-index:8;background:var(--card);border-bottom:1px solid var(--bd);padding:10px 18px;display:flex;align-items:center;gap:14px;justify-content:space-between}.brand{font-weight:800}.brand small{display:block;color:var(--mu);font-weight:500;font-size:11px}
+nav{display:flex;gap:5px;flex-wrap:wrap}nav button{border:0;background:transparent}nav button.on{background:var(--ac);color:#fff}
+main{max-width:1180px;margin:auto;padding:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;box-shadow:var(--sh);margin-bottom:14px}.hero{background:linear-gradient(135deg,#087a4b,#0d5f8c);color:white}.hero .mu{color:#e8f3ee}.k{font-size:28px;font-weight:800;color:var(--ac)}.mu{color:var(--mu);font-size:13px}.tag{display:inline-block;padding:3px 8px;border-radius:99px;background:#eef4f0;border:1px solid var(--bd);font-size:12px}.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.sc{overflow:auto}table{border-collapse:collapse;width:100%}th,td{padding:9px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:middle}th{font-size:12px;color:var(--mu)}tr.click{cursor:pointer}tr.click:hover{background:#f3f7f4}.empty{padding:24px;text-align:center;color:var(--mu)}textarea{width:100%;min-height:110px;resize:vertical}.field{display:grid;gap:5px;margin-bottom:10px}.field label{font-size:12px;color:var(--mu);font-weight:650}.modal{position:fixed;inset:0;background:#10201966;display:none;align-items:center;justify-content:center;z-index:20;padding:18px}.modal.show{display:flex}.modal>div{max-width:680px;width:100%;max-height:90vh;overflow:auto}.close{float:right}.msg{padding:12px;border:1px solid var(--bd);border-radius:10px;margin:8px 0}.msg.unread{border-left:4px solid var(--ac);background:#f3faf6}.msg .meta{font-size:12px;color:var(--mu)}#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#173a2a;color:white;padding:11px 17px;border-radius:10px;z-index:30;box-shadow:var(--sh)}#toast.bad{background:var(--er)}.lg{max-width:390px;margin:13vh auto}.loginwrap{min-height:100vh;display:grid;place-items:center;padding:18px}.loginwrap .card{width:100%}.accent{color:var(--ac)}@media(max-width:760px){.two{grid-template-columns:1fr}header{position:static}.brand{min-width:100%}main{padding:12px}}@media print{header,.np,#toast{display:none!important}.card{box-shadow:none}}
+</style></head><body><div id="app"></div><div id="toast" hidden></div><div id="modal" class="modal"><div class="card" id="modalBody"></div></div>
 <script>
 const sb=supabase.createClient('https://bkuhcxgmxrbjydkuklgo.supabase.co','sb_publishable_rjpYK53ugeDJrVoRo2B6mQ_5raQHAVU');
-const app=document.getElementById('app'),S={};
+const app=document.getElementById('app'),toastEl=document.getElementById('toast'),M={};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const ST={draft:'Brouillon',validated:'Validé',published:'Publié',locked:'Verrouillé'};
-const f2=n=>n==null?'–':Number(n).toFixed(2);
-function toast(m,bad){const t=document.getElementById('t');t.textContent=m;t.className=bad?'bad':'';t.hidden=false;setTimeout(()=>t.hidden=true,3500)}
-const opts=(a,v,l,sel)=>a.map(x=>`<option value="${esc(x[v])}"${x[v]==sel?' selected':''}>${esc(l(x))}</option>`).join('');
-
+const money=n=>n==null?'—':Number(n).toFixed(2),ST={draft:'Brouillon',validated:'Validé',published:'Publié',locked:'Verrouillé'};
+function toast(x,bad=false){toastEl.textContent=x;toastEl.className=bad?'bad':'';toastEl.hidden=false;setTimeout(()=>toastEl.hidden=true,3500)}
+function closeModal(){document.getElementById('modal').classList.remove('show')}
+function modal(html){document.getElementById('modalBody').innerHTML=html;document.getElementById('modal').classList.add('show')}
+const opts=(a,v,l,sel)=>a.map(x=>'<option value="'+esc(x[v])+'"'+(x[v]==sel?' selected':'')+'>'+esc(l(x))+'</option>').join('');
 async function boot(){
-  const{data:{session}}=await sb.auth.getSession();if(!session)return login();
-  const{data:me}=await sb.from('profiles').select('*').eq('auth_user_id',session.user.id).maybeSingle();
-  if(!me){app.innerHTML='<main><div class="card">Aucun profil associé à ce compte.</div></main>';return}
-  S.me=me;S.admin=['admin','school_life'].includes(me.role);
-  S.teacher=(await sb.from('teachers').select('id').eq('profile_id',me.id).maybeSingle()).data;
-  const[tm,cl]=await Promise.all([sb.from('terms').select('id,name,term_number,status').order('term_number'),sb.from('classes').select('id,name,academic_year_id,levels(sort_order)')]);
-  S.terms=tm.data||[];S.classes=(cl.data||[]).sort((a,b)=>a.levels.sort_order-b.levels.sort_order||a.name.localeCompare(b.name));
-  S.term=(S.terms.find(t=>t.status==='active')||S.terms[0])?.id;S.cls=S.classes[0]?.id;
-  const tabs=[];if(S.admin)tabs.push(['dash','Tableau de bord']);if(S.teacher)tabs.push(['notes','Notes']);if(S.admin)tabs.push(['bul','Bulletins']);tabs.push(['edt','Emploi du temps']);
-  if(!S.admin&&!S.teacher){app.innerHTML='<main><div class="card">Espace élève / parent : bientôt disponible.</div></main>';return}
-  S.tabs=tabs;app.innerHTML=`<header><b>I2School · Lycée Mikolongo</b><nav>${tabs.map(t=>`<button data-t="${t[0]}">${t[1]}</button>`).join('')}</nav>
-  <span class="mu">${esc(me.first_name)} ${esc(me.last_name)} <span class="tag">${esc(me.role)}${S.teacher?' + enseignant':''}</span> <button id="lo">Quitter</button></span></header><main id="v"></main>`;
-  app.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.t));
-  document.getElementById('lo').onclick=async()=>{await sb.auth.signOut();location.reload()};go(tabs[0][0]);
+ const {data:{session}}=await sb.auth.getSession(); if(!session)return login();
+ const {data:me,error}=await sb.from('profiles').select('*').eq('auth_user_id',session.user.id).maybeSingle();
+ if(error||!me){app.innerHTML='<main><div class="card">Profil introuvable pour ce compte.</div></main>';return}
+ M.me=me;M.staff=['admin','school_life'].includes(me.role);
+ M.teacher=(await sb.from('teachers').select('id,profile_id').eq('profile_id',me.id).maybeSingle()).data;
+ M.student=(await sb.from('students').select('id,first_name,last_name,student_number').eq('profile_id',me.id).maybeSingle()).data;
+ M.parent=(await sb.from('parents').select('id').eq('profile_id',me.id).maybeSingle()).data;
+ const [ty,cl,en]=await Promise.all([
+  sb.from('terms').select('id,name,term_number,status').order('term_number'),
+  sb.from('classes').select('id,name,code,academic_year_id,level_id,levels(name,sort_order)').order('name'),
+  sb.from('subjects').select('id,name,is_enabled').eq('name','Anglais').maybeSingle()
+ ]);
+ M.terms=ty.data||[];M.classes=cl.data||[];M.english=en.data;M.term=(M.terms.find(x=>x.status==='active')||M.terms[0])?.id;
+ if(M.student||M.parent){return learnerShell()}
+ if(!M.staff&&!M.teacher){app.innerHTML='<main><div class="card">Votre profil ne possède pas encore d’espace actif.</div></main>';return}
+ await loadEnglishClasses();
+ staffShell();
+}
+async function loadEnglishClasses(){
+ if(M.staff){
+  const {data}=await sb.from('class_subjects').select('class_id,classes(id,name,code,academic_year_id,levels(name,sort_order)),subjects!inner(id,name,is_enabled)').eq('subject_id',M.english?.id).eq('subjects.is_enabled',true);
+  M.eclasses=(data||[]).map(x=>x.classes).filter(Boolean);
+ }else{
+  const {data}=await sb.from('teacher_assignments').select('class_id,classes(id,name,code,academic_year_id,levels(name,sort_order)),subjects!inner(id,name,is_enabled)').eq('teacher_id',M.teacher.id).eq('subject_id',M.english?.id).eq('subjects.is_enabled',true);
+  M.eclasses=(data||[]).map(x=>x.classes).filter(Boolean);
+ }
+ M.eclasses=[...new Map(M.eclasses.map(x=>[x.id,x])).values()].sort((a,b)=>(a.levels?.sort_order||0)-(b.levels?.sort_order||0)||a.name.localeCompare(b.name));
+ M.cls=M.eclasses[0]?.id;
 }
 function login(){
-  app.innerHTML=`<div class="card lg"><h2>I2School</h2><p class="mu">Lycée Mikolongo – connexion</p><input id="e" type="email" placeholder="Email" autocomplete="username"><input id="p" type="password" placeholder="Mot de passe" autocomplete="current-password"><button class="p" id="lgin" style="width:100%">Se connecter</button></div>`;
-  const run=async()=>{const{error}=await sb.auth.signInWithPassword({email:e.value.trim(),password:p.value});error?toast('Identifiants incorrects',1):boot()};
-  lgin.onclick=run;p.onkeydown=e=>{if(e.key==='Enter')run()};
+ app.innerHTML='<div class="loginwrap"><div class="card lg"><div class="hero card" style="margin:-16px -16px 16px;border:0"><h1 style="margin:0">I2School</h1><div class="mu">Espace Anglais · Lycée Mikolongo</div></div><h2>Connexion</h2><p class="mu">Élève, parent, enseignant ou administrateur</p><div class="field"><label>Adresse e-mail</label><input id="le" type="email" autocomplete="username"></div><div class="field"><label>Mot de passe</label><input id="lp" type="password" autocomplete="current-password"></div><button class="p" id="loginBtn" style="width:100%">Se connecter</button></div></div>';
+ const run=async()=>{const {error}=await sb.auth.signInWithPassword({email:le.value.trim(),password:lp.value});if(error)toast('Identifiants incorrects',true);else location.reload()};loginBtn.onclick=run;lp.onkeydown=e=>{if(e.key==='Enter')run()}
 }
-function go(t){S.tab=t;app.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));({dash,notes,bul,edt})[t]()}
-const V=()=>document.getElementById('v');
-const clsSel=(id='cs')=>`<select id="${id}">${opts(S.classes,'id',c=>c.name,S.cls)}</select>`;
-const termSel=()=>`<select id="ts">${opts(S.terms,'id',t=>t.name,S.term)}</select>`;
-
-async function dash(){
-  V().innerHTML='<div class="card mu">Chargement…</div>';
-  const cnt=t=>sb.from(t).select('*',{count:'exact',head:true});
-  const[a,b,c,d,e,rc]=await Promise.all([cnt('students'),cnt('teachers'),cnt('classes'),cnt('parents'),cnt('assessments'),sb.from('report_cards').select('status')]);
-  const by={};(rc.data||[]).forEach(r=>by[r.status]=(by[r.status]||0)+1);
-  const k=(n,l)=>`<div class="card"><div class="k">${n??0}</div><div class="mu">${l}</div></div>`;
-  V().innerHTML=`<div class="grid">${k(a.count,'Élèves')}${k(b.count,'Enseignants')}${k(c.count,'Classes')}${k(d.count,'Parents')}${k(e.count,'Évaluations')}</div>
-  <div class="card"><b>Bulletins</b><div class="bar" style="margin-top:8px">${Object.keys(ST).map(s=>`<span class="tag">${ST[s]} : ${by[s]||0}</span>`).join('')}</div></div>`;
+function shell(title,subtitle,tabs){
+ app.innerHTML='<header><div class="brand">I2School <small>Lycée Mikolongo · Anglais</small></div><nav id="nav">'+tabs.map(x=>'<button data-tab="'+x[0]+'">'+x[1]+'</button>').join('')+'</nav><div><span class="tag">'+esc(M.me.role)+'</span> <button id="logout">Quitter</button></div></header><main id="view"></main>';
+ document.getElementById('logout').onclick=async()=>{await sb.auth.signOut();location.reload()};
+ document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.tab));go(tabs[0][0])
 }
-
+function go(t){M.tab=t;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));({home:home,classes:classes,notes:notes,bulletins:bulletins,comms:comms,inbox:inbox,edt:edt})[t]?.()}
+function staffShell(){let tabs=[['home','Accueil'],['classes','Mes classes'],['notes','Notes'],['bulletins','Bulletins'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']];shell('','',tabs)}
+function learnerShell(){let tabs=[['home','Accueil'],['notes','Mes notes'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']];shell('','',tabs)}
+const V=()=>document.getElementById('view');
+async function home(){
+ if(M.staff||M.teacher){
+  const [st,ev,rc,msg]=await Promise.all([
+   sb.from('students').select('*',{count:'exact',head:true}),
+   sb.from('assessments').select('*',{count:'exact',head:true}).eq('subject_id',M.english?.id),
+   sb.from('report_cards').select('status').eq('academic_year_id',M.eclasses[0]?.academic_year_id),
+   sb.from('messages').select('id',{count:'exact',head:true}).eq('recipient_profile_id',M.me.id).is('read_at',null)
+  ]);
+  V().innerHTML='<div class="card hero"><h2 style="margin:0 0 6px">Espace Anglais</h2><div class="mu">Gérez vos classes, notes, bulletins et échanges sans exposer les autres matières.</div></div><div class="grid"><div class="card"><div class="k">'+(M.eclasses?.length||0)+'</div><div class="mu">Classes d’anglais</div></div><div class="card"><div class="k">'+(st.count||0)+'</div><div class="mu">Élèves de l’établissement</div></div><div class="card"><div class="k">'+(ev.count||0)+'</div><div class="mu">Évaluations d’anglais</div></div><div class="card"><div class="k">'+(msg.count||0)+'</div><div class="mu">Messages non lus</div></div></div><div class="card"><b>Votre rôle actuel</b><p class="mu">Vous pouvez travailler comme administrateur et comme professeur d’anglais. Les autres matières restent dans la structure de l’établissement mais ne sont pas proposées dans cet espace.</p></div>';
+ }else{
+  let student=M.student, cls;
+  if(student){const q=await sb.from('enrollments').select('class_id,classes(name,levels(name))').eq('student_id',student.id).is('withdrawn_at',null).order('enrolled_at',{ascending:false}).limit(1).maybeSingle();cls=q.data?.classes}
+  else {const q=await sb.from('parent_student').select('student_id,students(id,first_name,last_name)').eq('parent_id',M.parent.id);M.children=(q.data||[]).map(x=>x.students)}
+  V().innerHTML='<div class="card hero"><h2 style="margin:0">Espace Anglais</h2><p class="mu">'+(student?'Bonjour '+esc(student.first_name)+'. Voici votre suivi en anglais.':'Bienvenue. Vous pouvez suivre les élèves rattachés à votre compte.')+'</p></div>'+(cls?'<div class="card"><b>Classe</b><p>'+esc(cls.name)+' · '+esc(cls.levels?.name||'')+'</p></div>':'');
+ }
+}
+async function classes(){
+ V().innerHTML='<div class="bar"><select id="classPick">'+opts(M.eclasses,'id',x=>x.name,M.cls)+'</select><button class="p" id="newStudent">+ Nouvel élève</button><button id="addExisting">Ajouter un élève existant</button></div><div id="roster"></div>';
+ classPick.onchange=()=>{M.cls=classPick.value;roster()};newStudent.onclick=()=>studentForm();addExisting.onclick=()=>existingStudentForm();roster()
+}
+async function roster(){
+ M.cls=classPick.value;const {data,error}=await sb.rpc('get_managed_class_roster',{p_class_id:M.cls});if(error){roster.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
+ roster.innerHTML='<div class="card sc"><div class="bar"><b>'+esc(M.eclasses.find(x=>x.id===M.cls)?.name||'Classe')+'</b><span class="tag">'+(data?.length||0)+' élèves</span></div><table><tr><th>#</th><th>Élève</th><th>Matricule</th><th>Accès</th><th></th></tr>'+(data||[]).map((x,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+esc(x.last_name)+' '+esc(x.first_name)+'</b><div class="mu">'+esc(x.email||'')+'</div></td><td>'+esc(x.student_number||'—')+'</td><td><span class="tag">'+(x.has_login?'Accès créé':'Pas encore d’accès')+'</span></td><td><button class="d" data-remove="'+x.student_id+'">Retirer</button></td></tr>').join('')+'</table></div>';
+ roster.querySelectorAll('[data-remove]').forEach(b=>b.onclick=async()=>{if(!confirm('Retirer cet élève de la classe ? Son historique sera conservé.'))return;const {error}=await sb.rpc('remove_student_from_managed_class',{p_student_id:b.dataset.remove,p_class_id:M.cls,p_withdrawn_at:new Date().toISOString().slice(0,10)});error?toast(error.message,true):(toast('Élève retiré de la classe'),roster())})
+}
+function studentForm(){
+ modal('<button class="close" onclick="closeModal()">×</button><h2>Créer un élève</h2><p class="mu">Un e-mail envoie une invitation de connexion. Sans e-mail, l’élève reste inscrit sans accès.</p><div class="two"><div class="field"><label>Prénom *</label><input id="sf" required></div><div class="field"><label>Nom *</label><input id="sl" required></div><div class="field"><label>Matricule</label><input id="sn"></div><div class="field"><label>E-mail de l’élève</label><input id="se" type="email"></div><div class="field"><label>Téléphone</label><input id="sp"></div><div class="field"><label>Date de naissance</label><input id="sd" type="date"></div></div><div class="bar"><button onclick="closeModal()">Annuler</button><button class="p" id="createStudentBtn">Créer et inscrire</button></div>');
+ createStudentBtn.onclick=async()=>{if(!sf.value.trim()||!sl.value.trim())return toast('Prénom et nom sont obligatoires',true);createStudentBtn.disabled=true;const {data,error}=await sb.functions.invoke('admin-create-student',{body:{first_name:sf.value.trim(),last_name:sl.value.trim(),student_number:sn.value.trim()||null,email:se.value.trim()||null,phone:sp.value.trim()||null,date_of_birth:sd.value||null,class_id:M.cls,enrolled_at:new Date().toISOString().slice(0,10)}});createStudentBtn.disabled=false;if(error){toast(error.message,true);return}closeModal();toast(data?.message||'Élève créé');roster()}
+}
+async function existingStudentForm(){
+ const {data:students}=await sb.from('students').select('id,first_name,last_name,student_number').order('last_name').limit(1000);
+ modal('<button class="close" onclick="closeModal()">×</button><h2>Ajouter un élève existant</h2><div class="field"><label>Élève</label><select id="existStudent">'+opts(students||[],'id',x=>x.last_name+' '+x.first_name+' — '+(x.student_number||'sans matricule'))+'</select></div><div class="bar"><button onclick="closeModal()">Annuler</button><button class="p" id="addExistingBtn">Ajouter à la classe</button></div>');
+ addExistingBtn.onclick=async()=>{const {error}=await sb.rpc('admin_add_existing_student_to_class',{p_student_id:existStudent.value,p_class_id:M.cls,p_enrolled_at:new Date().toISOString().slice(0,10)});if(error)toast(error.message,true);else{closeModal();toast('Élève ajouté à la classe');roster()}}
+}
 async function notes(){
-  const{data:as}=await sb.from('teacher_assignments').select('class_id,subject_id,classes(name),subjects(name)').eq('teacher_id',S.teacher.id);
-  S.as=(as||[]).map((x,i)=>({...x,i,l:`${x.classes.name} — ${x.subjects.name}`}));
-  V().innerHTML=`<div class="bar"><select id="as">${opts(S.as,'i',x=>x.l)}</select>${termSel()}</div><div id="ev"></div>`;
-  as_.onchange=ts.onchange=evList;S.term=ts.value;evList();
+ if(!(M.staff||M.teacher)){return learnerNotes()}
+ const {data:assign}=await sb.from('teacher_assignments').select('class_id,teacher_id,classes(name),subjects!inner(id,name,is_enabled)').eq('subject_id',M.english?.id).eq('subjects.is_enabled',true).eq('teacher_id',M.teacher.id);
+ M.noteClasses=M.staff?M.eclasses:(assign||[]).map(x=>x.classes);
+ V().innerHTML='<div class="bar"><select id="noteClass">'+opts(M.noteClasses,'id',x=>x.name,M.cls)+'</select>'+termSelect()+'<button class="p" id="createEval">+ Nouvelle évaluation</button></div><div id="evalList"></div><div id="gradeBox"></div>';
+ noteClass.onchange=()=>{M.cls=noteClass.value;evalList()};ts.onchange=evalList;evalList()
 }
-async function evList(){
-  S.term=ts.value;const x=S.as[as_.value];if(!x)return;
-  const{data}=await sb.from('assessments').select('id,title,assessment_date,status,max_score,coefficient').eq('class_id',x.class_id).eq('subject_id',x.subject_id).eq('term_id',S.term).order('assessment_date');
-  ev.innerHTML=`<div class="card sc"><table><tr><th>Évaluation</th><th>Date</th><th>Barème</th><th>Coef.</th><th>Statut</th><th></th></tr>${(data||[]).map(a=>`<tr><td>${esc(a.title)}</td><td>${esc(a.assessment_date)}</td><td>/${a.max_score}</td><td>${a.coefficient}</td><td><span class="tag">${esc(a.status)}</span></td><td><button data-a="${a.id}" data-l="${a.status==='locked'}">Saisir les notes</button></td></tr>`).join('')||'<tr><td class="mu">Aucune évaluation</td></tr>'}</table></div><div id="gr"></div>`;
-  ev.querySelectorAll('button[data-a]').forEach(b=>b.onclick=()=>grid(b.dataset.a,b.dataset.l==='true'));
+function termSelect(){return '<select id="ts">'+opts(M.terms,'id',x=>x.name,M.term)+'</select>'}
+async function evalList(){
+ M.cls=noteClass.value;M.term=ts.value;const {data,error}=await sb.from('assessments').select('id,title,assessment_date,max_score,coefficient,status').eq('class_id',M.cls).eq('term_id',M.term).eq('subject_id',M.english?.id).order('assessment_date',{ascending:false});
+ if(error)return toast(error.message,true);
+ evalList.innerHTML='<div class="card sc"><table><tr><th>Évaluation</th><th>Date</th><th>Barème</th><th>Coef.</th><th>Statut</th><th></th></tr>'+(data||[]).map(a=>'<tr><td><b>'+esc(a.title)+'</b></td><td>'+esc(a.assessment_date||'')+'</td><td>/'+a.max_score+'</td><td>'+a.coefficient+'</td><td><span class="tag">'+ST[a.status]+'</span></td><td><button data-grade="'+a.id+'">Saisir</button></td></tr>').join('')+'</table></div>';
+ evalList.querySelectorAll('[data-grade]').forEach(b=>b.onclick=()=>gradeGrid(b.dataset.grade))
 }
-async function grid(id,locked){
-  const{data,error}=await sb.from('assessment_results').select('id,assessment_id,student_id,score,status,students(first_name,last_name,student_number)').eq('assessment_id',id);
-  if(error)return toast(error.message,1);
-  const r=(data||[]).sort((a,b)=>a.students.last_name.localeCompare(b.students.last_name)||a.students.first_name.localeCompare(b.students.first_name));
-  gr.innerHTML=`<div class="card sc"><table><tr><th>Élève</th><th>Note</th><th>Statut</th></tr>${r.map(x=>`<tr data-id="${x.id}" data-a="${x.assessment_id}" data-s="${x.student_id}"><td>${esc(x.students.last_name)} ${esc(x.students.first_name)} <span class="mu">${esc(x.students.student_number)}</span></td>
-  <td><input type="number" min="0" step="0.25" value="${x.score??''}"${locked?' disabled':''}></td><td><select${locked?' disabled':''}>${['present','absent','excused','missing'].map(s=>`<option${s===x.status?' selected':''}>${s}</option>`).join('')}</select></td></tr>`).join('')}</table>
-  <div class="bar" style="margin:12px 0 0"><button class="p" id="sv"${locked?' disabled':''}>Enregistrer</button>${locked?'<span class="mu">Évaluation verrouillée</span>':''}</div></div>`;
-  sv.onclick=async()=>{const rows=[...gr.querySelectorAll('tr[data-id]')].map(t=>{const st=t.querySelector('select').value,v=t.querySelector('input').value;
-    return{id:t.dataset.id,assessment_id:t.dataset.a,student_id:t.dataset.s,status:st,score:st==='present'&&v!==''?Number(v):null}});
-    const{error}=await sb.from('assessment_results').upsert(rows);error?toast(error.message,1):toast('Notes enregistrées')};
+function createEvaluation(){
+ modal('<button class="close" onclick="closeModal()">×</button><h2>Nouvelle évaluation d’anglais</h2><div class="two"><div class="field"><label>Titre *</label><input id="et"></div><div class="field"><label>Date</label><input id="ed" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div><div class="field"><label>Barème</label><input id="em" type="number" min="1" value="20"></div><div class="field"><label>Coefficient</label><input id="ec" type="number" min=".01" step=".01" value="1"></div><div class="field"><label>Type</label><select id="etype"><option value="test">Test</option><option value="exam">Examen</option><option value="homework">Devoir</option><option value="oral">Oral</option><option value="project">Projet</option></select></div></div><div class="bar"><button onclick="closeModal()">Annuler</button><button class="p" id="saveEval">Créer</button></div>');
+ saveEval.onclick=async()=>{if(!et.value.trim())return toast('Titre obligatoire',true);const teacherId=M.teacher.id;const {data:a,error}=await sb.from('assessments').insert({school_id:M.me.school_id,academic_year_id:M.eclasses.find(x=>x.id===M.cls).academic_year_id,term_id:M.term,class_id:M.cls,subject_id:M.english.id,teacher_id:teacherId,title:et.value.trim(),assessment_date:ed.value,max_score:Number(em.value),coefficient:Number(ec.value),type:etype.value,status:'draft'}).select('id').single();if(error){toast(error.message,true);return}const {data:en,error:e2}=await sb.from('enrollments').select('student_id').eq('class_id',M.cls).is('withdrawn_at',null);if(e2){toast(e2.message,true);return}if(en?.length){const rows=en.map(x=>({assessment_id:a.id,student_id:x.student_id,score:null,status:'missing'}));const {error:e3}=await sb.from('assessment_results').insert(rows);if(e3)return toast(e3.message,true)}closeModal();toast('Évaluation créée');evalList()}
 }
-const as_={get value(){return document.getElementById('as').value},set onchange(f){document.getElementById('as').onchange=f}};
-
-async function bul(){
-  V().innerHTML=`<div class="bar">${clsSel()}${termSel()}<button class="p" id="g">Générer</button><button data-n="validated">Valider</button><button data-n="published">Publier</button><button data-n="locked">Verrouiller</button><label class="mu"><input type="checkbox" id="fo"> forcer si incomplet</label></div><div id="bl"></div>`;
-  cs.onchange=ts.onchange=bList;
-  const rpc=async(fn,a,m)=>{const{data,error}=await sb.rpc(fn,a);error?toast(error.message,1):(toast(m(data)),bList())};
-  g.onclick=()=>rpc('generate_report_cards',{p_class_id:cs.value,p_term_id:ts.value},d=>`${d.bulletins_crees+d.bulletins_mis_a_jour} bulletins générés (${d.ignores_non_brouillon} ignorés)`);
-  document.querySelectorAll('button[data-n]').forEach(b=>b.onclick=()=>{if(b.dataset.n==='locked'&&!confirm('Verrouiller définitivement les bulletins ET les évaluations de cette classe ?'))return;
-    rpc('set_report_cards_status',{p_class_id:cs.value,p_term_id:ts.value,p_new_status:b.dataset.n,p_allow_incomplete:fo.checked},d=>`${d.bulletins_modifies} bulletins → ${ST[d.nouveau_statut]}`)});
-  bList();
+async function gradeGrid(id){
+ const {data,error}=await sb.from('assessment_results').select('id,student_id,score,status,students(first_name,last_name,student_number)').eq('assessment_id',id);if(error)return toast(error.message,true);
+ const {data:ass}=await sb.from('assessments').select('status,max_score,title').eq('id',id).single();const locked=ass.status==='locked';
+ gradeBox.innerHTML='<div class="card sc"><div class="bar"><b>'+esc(ass.title)+'</b><span class="tag">'+ST[ass.status]+'</span></div><table><tr><th>Élève</th><th>Note /'+ass.max_score+'</th><th>Statut</th></tr>'+(data||[]).sort((a,b)=>a.students.last_name.localeCompare(b.students.last_name)).map(x=>'<tr data-r="'+x.id+'"><td>'+esc(x.students.last_name)+' '+esc(x.students.first_name)+' <span class="mu">'+esc(x.students.student_number||'')+'</span></td><td><input type="number" min="0" max="'+ass.max_score+'" step=".25" value="'+(x.score??'')+'" '+(locked?'disabled':'')+'></td><td><select '+(locked?'disabled':'')+'>'+['present','absent','excused','missing'].map(s=>'<option '+(s===x.status?'selected':'')+'>'+s+'</option>').join('')+'</select></td></tr>').join('')+'</table><div class="bar"><button class="p" id="saveGrades" '+(locked?'disabled':'')+'>Enregistrer</button><button id="publishEval" '+(locked?'disabled':'')+'>Publier</button></div></div>';
+ saveGrades.onclick=async()=>{const rows=[...gradeBox.querySelectorAll('tr[data-r]')].map(t=>{const s=t.querySelector('select').value,v=t.querySelector('input').value;return{id:t.dataset.r,score:s==='present'&&v!==''?Number(v):null,status:s}});const {error}=await sb.from('assessment_results').upsert(rows);error?toast(error.message,true):toast('Notes enregistrées')};
+ publishEval.onclick=async()=>{const {error}=await sb.from('assessments').update({status:'published'}).eq('id',id);error?toast(error.message,true):(toast('Évaluation publiée'),gradeGrid(id),evalList())}
 }
-async function bList(){
-  S.cls=cs.value;S.term=ts.value;
-  const{data}=await sb.from('report_cards').select('id,status,general_average,rank,class_average,class_size,students(first_name,last_name)').eq('class_id',S.cls).eq('term_id',S.term);
-  const r=(data||[]).sort((a,b)=>(a.rank??999)-(b.rank??999));
-  bl.innerHTML=`<div class="card sc"><table><tr><th>Rang</th><th>Élève</th><th>Moyenne</th><th>Statut</th></tr>${r.map(x=>`<tr class="cl" data-id="${x.id}"><td>${x.rank??'–'}/${x.class_size??''}</td><td>${esc(x.students.last_name)} ${esc(x.students.first_name)}</td><td><b>${f2(x.general_average)}</b></td><td><span class="tag">${ST[x.status]}</span></td></tr>`).join('')||'<tr><td class="mu">Aucun bulletin : cliquez sur « Générer ».</td></tr>'}</table></div><div id="bd"></div>`;
-  bl.querySelectorAll('tr.cl').forEach(t=>t.onclick=()=>bDetail(r.find(x=>x.id===t.dataset.id)));
+document.addEventListener('click',e=>{if(e.target.id==='createEval')createEvaluation()});
+async function learnerNotes(){
+ if(M.student){const {data}=await sb.from('assessment_results').select('score,status,assessments(title,assessment_date,max_score,coefficient,term_id,subjects!inner(name,is_enabled))').eq('student_id',M.student.id).eq('assessments.subject_id',M.english?.id).eq('assessments.status','published');renderLearnerNotes(data||[],M.student.first_name)}
+ else {const kids=M.children||[];let html='<div class="bar"><select id="kid">'+opts(kids,'id',x=>x.last_name+' '+x.first_name)+'</select></div><div id="kidNotes"></div>';V().innerHTML=html;kid.onchange=()=>parentNotes(kid.value);if(kids[0])parentNotes(kids[0].id)}
 }
-async function bDetail(c){
-  const{data}=await sb.from('report_card_subjects').select('subject_average,coefficient,class_average,class_min,class_max,rank,subjects(name)').eq('report_card_id',c.id);
-  const r=(data||[]).sort((a,b)=>a.subjects.name.localeCompare(b.subjects.name));
-  bd.innerHTML=`<div class="card sc"><h3 style="margin-top:0">Bulletin – ${esc(c.students.first_name)} ${esc(c.students.last_name)}</h3><table><tr><th>Matière</th><th>Coef.</th><th>Moyenne</th><th>Classe</th><th>Min</th><th>Max</th><th>Rang</th></tr>${r.map(x=>`<tr><td>${esc(x.subjects.name)}</td><td>${x.coefficient}</td><td><b>${f2(x.subject_average)}</b></td><td>${f2(x.class_average)}</td><td>${f2(x.class_min)}</td><td>${f2(x.class_max)}</td><td>${x.rank??'–'}</td></tr>`).join('')}</table>
-  <p><b>Moyenne générale : ${f2(c.general_average)}</b> · rang ${c.rank??'–'}/${c.class_size??''} · moyenne de classe ${f2(c.class_average)}</p><button class="np" onclick="print()">Imprimer</button></div>`;
-  bd.scrollIntoView({behavior:'smooth'});
+async function parentNotes(id){const {data}=await sb.from('assessment_results').select('score,status,assessments(title,assessment_date,max_score,coefficient,subjects!inner(name,is_enabled))').eq('student_id',id).eq('assessments.subject_id',M.english?.id).eq('assessments.status','published');kidNotes.innerHTML='<div class="card">'+(data||[]).map(x=>'<div class="msg"><b>'+esc(x.assessments.title)+'</b><div class="meta">'+esc(x.assessments.assessment_date||'')+' · coef. '+x.assessments.coefficient+'</div><strong>'+(x.status==='present'?money(x.score)+' / '+x.assessments.max_score:x.status)+'</strong></div>').join('')||'<div class="empty">Aucune note publiée.</div></div>'}
+function renderLearnerNotes(data,name){V().innerHTML='<div class="card"><h2>Mes notes d’anglais</h2><p class="mu">Bonjour '+esc(name)+'. Seules les évaluations publiées sont visibles.</p>'+(data||[]).map(x=>'<div class="msg"><b>'+esc(x.assessments.title)+'</b><div class="meta">'+esc(x.assessments.assessment_date||'')+' · coef. '+x.assessments.coefficient+'</div><strong>'+(x.status==='present'?money(x.score)+' / '+x.assessments.max_score:x.status)+'</strong></div>').join('')||'<div class="empty">Aucune note publiée.</div>'+'</div>'}
+async function bulletins(){
+ if(!M.staff){V().innerHTML='<div class="card empty">Les bulletins publiés seront affichés ici lorsque la génération aura été effectuée.</div>';return}
+ V().innerHTML='<div class="bar"><select id="bc">'+opts(M.eclasses,'id',x=>x.name,M.cls)+'</select>'+termSelect()+'<button class="p" id="genBul">Générer les bulletins</button><button id="pubBul">Publier</button></div><div id="bulList"></div>';bc.onchange=()=>{M.cls=bc.value;bulletinList()};ts.onchange=bulletinList;genBul.onclick=generateBul;pubBul.onclick=publishBul;bulletinList()
 }
-
+async function generateBul(){const {data,error}=await sb.rpc('generate_report_cards',{p_class_id:M.cls,p_term_id:ts.value});if(error)toast(error.message,true);else{toast((data?.bulletins_crees||0)+(data?.bulletins_mis_a_jour||0)+' bulletins traités');bulletinList()}}
+async function publishBul(){const {data,error}=await sb.rpc('set_report_cards_status',{p_class_id:M.cls,p_term_id:ts.value,p_new_status:'published',p_allow_incomplete:false});if(error)toast(error.message,true);else{toast((data?.bulletins_modifies||0)+' bulletins publiés');bulletinList()}}
+async function bulletinList(){const {data}=await sb.from('report_cards').select('id,status,general_average,rank,class_size,students(first_name,last_name)').eq('class_id',M.cls).eq('term_id',ts.value);bulList.innerHTML='<div class="card sc"><table><tr><th>Élève</th><th>Moyenne</th><th>Rang</th><th>Statut</th></tr>'+(data||[]).map(x=>'<tr><td>'+esc(x.students.last_name)+' '+esc(x.students.first_name)+'</td><td>'+money(x.general_average)+'</td><td>'+(x.rank??'—')+'/'+(x.class_size??'—')+'</td><td><span class="tag">'+ST[x.status]+'</span></td></tr>').join('')+'</table></div>'}
+async function comms(){
+ const {data,error}=await sb.from('announcements').select('id,title,content,published_at,created_at,author_profile_id').eq('school_id',M.me.school_id).order('created_at',{ascending:false}).limit(30);if(error)return toast(error.message,true);
+ let compose=(M.staff||M.teacher)?'<button class="p" id="newInfo">+ Nouvelle information</button>':'';
+ V().innerHTML='<div class="bar"><h2 style="margin-right:auto">Informations</h2>'+compose+'</div>'+(data||[]).map(x=>'<div class="card"><div class="mu">'+esc(x.published_at?new Date(x.published_at).toLocaleString('fr-FR'):'Brouillon')+'</div><h3>'+esc(x.title)+'</h3><p style="white-space:pre-wrap">'+esc(x.content)+'</p></div>').join('')||'<div class="card empty">Aucune information.</div>';
+ if(document.getElementById('newInfo'))newInfo.onclick=announcementForm
+}
+function announcementForm(){
+ modal('<button class="close" onclick="closeModal()">×</button><h2>Publier une information</h2><p class="mu">Pour le moment, les informations sont diffusées dans l’espace Anglais de l’établissement.</p><div class="field"><label>Titre *</label><input id="it"></div><div class="field"><label>Message *</label><textarea id="ic"></textarea></div><div class="bar"><button onclick="closeModal()">Annuler</button><button class="p" id="sendInfo">Publier</button></div>');
+ sendInfo.onclick=async()=>{const {error}=await sb.from('announcements').insert({school_id:M.me.school_id,author_profile_id:M.me.id,title:it.value.trim(),content:ic.value.trim(),published_at:new Date().toISOString()});if(error)toast(error.message,true);else{closeModal();toast('Information publiée');comms()}}
+}
+async function inbox(){
+ const {data,error}=await sb.from('messages').select('id,sender_profile_id,recipient_profile_id,student_id,subject,body,read_at,created_at,sender:profiles!messages_sender_profile_id_fkey(first_name,last_name,role)').or('sender_profile_id.eq.'+M.me.id+',recipient_profile_id.eq.'+M.me.id).order('created_at',{ascending:false}).limit(80);
+ if(error)return toast(error.message,true);
+ V().innerHTML='<div class="bar"><h2 style="margin-right:auto">Messages</h2>'+(M.staff||M.teacher?'':'<button class="p" id="newMsg">Écrire au professeur</button>')+'</div>'+(data||[]).map(x=>'<div class="msg '+(!x.read_at&&x.recipient_profile_id===M.me.id?'unread':'')+'"><div class="meta">'+esc(x.sender?.first_name||'')+' '+esc(x.sender?.last_name||'')+' · '+new Date(x.created_at).toLocaleString('fr-FR')+'</div><b>'+esc(x.subject)+'</b><p style="white-space:pre-wrap">'+esc(x.body)+'</p>'+(!x.read_at&&x.recipient_profile_id===M.me.id?'<button data-read="'+x.id+'">Marquer comme lu</button>':'')+'</div>').join('')||'<div class="card empty">Aucun message.</div>';
+ document.querySelectorAll('[data-read]').forEach(b=>b.onclick=async()=>{await sb.from('messages').update({read_at:new Date().toISOString()}).eq('id',b.dataset.read);inbox()});
+ if(document.getElementById('newMsg'))newMsg.onclick=messageForm
+}
+async function messageForm(){
+ let teacherProfile=null;
+ if(M.student||M.parent){
+  const studentId=M.student?.id||M.children?.[0]?.id;
+  if(!studentId){return toast('Aucun élève rattaché',true)}
+  const {data:e}=await sb.from('enrollments').select('class_id').eq('student_id',studentId).is('withdrawn_at',null).limit(1).maybeSingle();
+  const {data:t}=await sb.from('teacher_assignments').select('teachers(profile_id),subjects!inner(id,name,is_enabled)').eq('class_id',e?.class_id).eq('subject_id',M.english?.id).eq('subjects.is_enabled',true).limit(1).maybeSingle();
+  teacherProfile=t?.teachers?.profile_id;
+ }
+ if(!teacherProfile)return toast('Professeur d’anglais introuvable pour cette classe',true);
+ modal('<button class="close" onclick="closeModal()">×</button><h2>Écrire au professeur d’anglais</h2><div class="field"><label>Objet *</label><input id="ms"></div><div class="field"><label>Message *</label><textarea id="mb"></textarea></div><button class="p" id="sendMsg">Envoyer</button>');
+ sendMsg.onclick=async()=>{const {error}=await sb.from('messages').insert({school_id:M.me.school_id,sender_profile_id:M.me.id,recipient_profile_id:teacherProfile,student_id:M.student?.id||null,subject:ms.value.trim(),body:mb.value.trim()});if(error)toast(error.message,true);else{closeModal();toast('Message envoyé');inbox()}}
+}
 async function edt(){
-  const mine=S.teacher?'<option value="me">Mes cours</option>':'';
-  V().innerHTML=`<div class="bar"><select id="cs">${mine}${opts(S.classes,'id',c=>c.name,S.admin?S.cls:'')}</select></div><div id="tt"></div>`;
-  cs.onchange=ttLoad;ttLoad();
-}
-async function ttLoad(){
-  const me=cs.value==='me';let q=sb.from('timetable').select('day_of_week,start_time,end_time,subjects(name),teachers(last_name),classes(name),rooms(name)');
-  q=me?q.eq('teacher_id',S.teacher.id):q.eq('class_id',cs.value);const{data}=await q;
-  const slots=[...new Set((data||[]).map(x=>x.start_time))].sort(),D=['Lun','Mar','Mer','Jeu','Ven'];
-  tt.innerHTML=`<div class="card sc"><table><tr><th></th>${D.map(d=>`<th>${d}</th>`).join('')}</tr>${slots.map(s=>`<tr><th>${s.slice(0,5)}</th>${D.map((_,i)=>{const x=(data||[]).find(y=>y.start_time===s&&y.day_of_week===i+1);
-  return`<td>${x?`<b>${esc(x.subjects.name)}</b><br><span class="mu">${esc(me?x.classes.name:x.teachers.last_name)} · ${esc(x.rooms?.name||'')}</span>`:''}</td>`}).join('')}</tr>`).join('')}</table></div>`;
-}
+ let q=sb.from('timetable').select('day_of_week,start_time,end_time,subjects(name),teachers(last_name),classes(name),rooms(name)').order('start_time');
+ if(M.teacher)q=q.eq('teacher_id',M.teacher.id);else if(M.student){const e=await sb.from('enrollments').select('class_id').eq('student_id',M.student.id).is('withdrawn_at',null).limit(1).maybeSingle();q=q.eq('class_id',e.data?.class_id)}else{V().innerHTML='<div class="card empty">L’emploi du temps détaillé sera affiché lorsque la classe de l’élève sera sélectionnée.</div>';return}
+ const {data,error}=await q;if(error)return toast(error.message,true);const days=['Lun','Mar','Mer','Jeu','Ven'];V().innerHTML='<div class="card sc"><h2>Emploi du temps</h2><table><tr><th>Jour</th><th>Heure</th><th>Matière</th><th>Classe</th><th>Salle</th></tr>'+(data||[]).map(x=>'<tr><td>'+days[(x.day_of_week||1)-1]+'</td><td>'+esc((x.start_time||'').slice(0,5))+'–'+esc((x.end_time||'').slice(0,5))+'</td><td>'+esc(x.subjects?.name||'')+'</td><td>'+esc(x.classes?.name||'')+'</td><td>'+esc(x.rooms?.name||'')+'</td></tr>').join('')+'</table></div>'}
 boot();
 </script></body></html>
