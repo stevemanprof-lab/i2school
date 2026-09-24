@@ -36,7 +36,7 @@ function authInviteState(){
 async function invitationSetup(){
  const s=authInviteState();
  if(s.error||s.errorCode){
-  app.innerHTML='<div class="loginwrap"><div class="card lg"><div class="hero card" style="margin:-16px -16px 16px;border:0"><h1 style="margin:0">I2School</h1><div class="mu">Activation du compte</div></div><h2>Lien d’invitation invalide ou expiré</h2><p class="mu">'+esc(s.description||'Le lien utilisé n’est plus valide.')+'</p><p class="mu">Demandez à l’administration de vous envoyer une nouvelle invitation.</p><button class="p" style="width:100%" onclick="location.hash='';location.reload()">Retour à la connexion</button></div></div>';
+  app.innerHTML='<div class="loginwrap"><div class="card lg"><div class="hero card" style="margin:-16px -16px 16px;border:0"><h1 style="margin:0">I2School</h1><div class="mu">Activation du compte</div></div><h2>Lien d’invitation invalide ou expiré</h2><p class="mu">'+esc(s.description||'Le lien utilisé n’est plus valide.')+'</p><p class="mu">Demandez à l’administration de vous envoyer une nouvelle invitation.</p><button class="p" style="width:100%" onclick="location.hash=&quot;&quot;;location.reload()">Retour à la connexion</button></div></div>';
   return true;
  }
  if(s.type!=='invite')return false;
