@@ -62,7 +62,7 @@ function shell(tabs){
  document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.tab));go(tabs[0][0])
 }
 function staffShell(){shell([['home','Accueil'],['classes','Mes classes'],['notes','Notes'],['bulletins','Bulletins'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']])}
-function learnerShell(){shell([['home','Accueil'],['notes','Mes notes'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']])}
+function learnerShell(){shell([['home','Accueil'],['notes','Mes notes'],['bulletins','Mes bulletins'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']])}
 function go(t){M.tab=t;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));({home,classes,notes,bulletins,comms,inbox,edt}[t]?.())}
 const V=()=>document.getElementById('view');
 
@@ -199,8 +199,30 @@ async function learnerNotes(){
 async function parentNotes(id){const {data}=await sb.from('assessment_results').select('score,status,assessments(title,assessment_date,max_score,coefficient,subjects!inner(name,is_enabled))').eq('student_id',id).eq('assessments.subject_id',M.english?.id).eq('assessments.status','published');kidNotes.innerHTML='<div class="card">'+(data||[]).map(x=>'<div class="msg"><b>'+esc(x.assessments.title)+'</b><div class="meta">'+esc(x.assessments.assessment_date||'')+' · coef. '+x.assessments.coefficient+'</div><strong>'+(x.status==='present'?money(x.score)+' / '+x.assessments.max_score:x.status)+'</strong></div>').join('')||'<div class="empty">Aucune note publiée.</div>'+'</div>'}
 function renderLearnerNotes(data,name){V().innerHTML='<div class="card"><h2>Mes notes d’anglais</h2><p class="mu">Bonjour '+esc(name)+'. Seules les évaluations publiées sont visibles.</p>'+(data||[]).map(x=>'<div class="msg"><b>'+esc(x.assessments.title)+'</b><div class="meta">'+esc(x.assessments.assessment_date||'')+' · coef. '+x.assessments.coefficient+'</div><strong>'+(x.status==='present'?money(x.score)+' / '+x.assessments.max_score:x.status)+'</strong></div>').join('')||'<div class="empty">Aucune note publiée.</div>'+'</div>'}
 
+async function learnerBulletins(){
+ if(M.student){
+  const {data,error}=await sb.from('report_cards').select('id,status,general_average,rank,class_size,term_id,terms(name),report_card_subjects(subject_id,subject_average,coefficient,appreciation,subjects!inner(name,is_enabled))').eq('student_id',M.student.id).in('status',['published','locked']).order('term_id');
+  if(error){V().innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
+  renderLearnerBulletins(data||[],M.student.first_name+' '+M.student.last_name);
+ }else{
+  const kids=M.children||[];
+  if(!kids.length){V().innerHTML='<div class="card empty">Aucun élève rattaché à ce compte.</div>';return}
+  V().innerHTML='<div class="bar"><label class="mu">Élève</label><select id="bulletinKid">'+opts(kids,'id',x=>x.last_name+' '+x.first_name)+'</select></div><div id="learnerBulletinBox"></div>';
+  const load=async()=>{const id=document.getElementById('bulletinKid').value;const {data,error}=await sb.from('report_cards').select('id,status,general_average,rank,class_size,term_id,terms(name),report_card_subjects(subject_id,subject_average,coefficient,appreciation,subjects!inner(name,is_enabled))').eq('student_id',id).in('status',['published','locked']).order('term_id');if(error){document.getElementById('learnerBulletinBox').innerHTML='<div class="card">'+esc(error.message)+'</div>';return}renderLearnerBulletins(data||[],kids.find(x=>x.id===id)?.first_name||'')}
+  document.getElementById('bulletinKid').onchange=load;await load();
+ }
+}
+function renderLearnerBulletins(cards,name){
+ const box=document.getElementById('learnerBulletinBox')||V();
+ if(!cards.length){box.innerHTML='<div class="card empty">Aucun bulletin d’anglais publié pour le moment.</div>';return}
+ box.innerHTML='<div class="card hero"><h2 style="margin:0">Bulletins d’anglais</h2><div class="mu">Suivi de '+esc(name)+'</div></div>'+cards.map(rc=>{
+   const english=(rc.report_card_subjects||[]).find(x=>x.subjects?.name==='Anglais'&&x.subjects?.is_enabled);
+   return '<div class="card"><div class="bar"><b>'+esc(rc.terms?.name||'Trimestre')+'</b><span class="tag">'+ST[rc.status]+'</span></div><div class="grid"><div><div class="k">'+money(rc.general_average)+'</div><div class="mu">Moyenne générale</div></div><div><div class="k">'+(rc.rank??'—')+'/'+(rc.class_size??'—')+'</div><div class="mu">Rang</div></div><div><div class="k">'+money(english?.subject_average)+'</div><div class="mu">Anglais · coef. '+(english?.coefficient??'—')+'</div></div></div>'+(english?.appreciation?'<p><b>Observation :</b> '+esc(english.appreciation)+'</p>':'')+'</div>'
+ }).join('');
+}
+
 async function bulletins(){
- if(!M.staff){V().innerHTML='<div class="card empty">Les bulletins publiés seront affichés ici lorsqu’ils auront été générés.</div>';return}
+ if(!M.staff)return learnerBulletins()
  V().innerHTML='<div class="bar"><select id="bc">'+opts(M.eclasses,'id',x=>x.name,M.cls)+'</select>'+termSelect()+'<button class="p" id="genBul">Générer</button><button id="pubBul">Publier</button></div><div id="bulList"></div>';bc.onchange=()=>{M.cls=bc.value;bulletinList()};ts.onchange=bulletinList;genBul.onclick=generateBul;pubBul.onclick=publishBul;bulletinList()
 }
 async function generateBul(){const {data,error}=await sb.rpc('generate_report_cards',{p_class_id:M.cls,p_term_id:ts.value});if(error)toast(error.message,true);else{toast(((data?.bulletins_crees||0)+(data?.bulletins_mis_a_jour||0))+' bulletins traités');bulletinList()}}
