@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>I2School – Lycée Mikolongo</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f5f7f6;--card:#fff;--tx:#17211c;--mu:#66766d;--ac:#0b7a4b;--bd:#dfe6e2;--er:#b3261e}
+@media(prefers-color-scheme:dark){:root{--bg:#111815;--card:#1a231f;--tx:#e8efeb;--mu:#93a39a;--ac:#3fbf85;--bd:#2b3832;--er:#f2827b}}
+*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--bd)}
+nav{display:flex;flex-wrap:wrap;gap:4px}nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+main{max-width:1000px;margin:0 auto;padding:16px}
+button,select,input{font:inherit;padding:7px 12px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--tx)}
+button{cursor:pointer}button.p{background:var(--ac);color:#fff;border-color:var(--ac)}button:disabled{opacity:.5;cursor:default}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.k{font-size:28px;font-weight:700;color:var(--ac)}.mu{color:var(--mu);font-size:13px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}.sc{overflow-x:auto}
+table{border-collapse:collapse;width:100%}th,td{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{font-size:12px;color:var(--mu)}
+tr.cl{cursor:pointer}tr.cl:hover{background:var(--bg)}td input[type=number]{width:80px}
+.tag{padding:2px 8px;border-radius:99px;background:var(--bg);border:1px solid var(--bd);font-size:12px}
+#t{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ac);color:#fff;padding:10px 16px;border-radius:10px;z-index:9}#t.bad{background:var(--er)}
+.lg{max-width:340px;margin:12vh auto}.lg input{width:100%;margin:6px 0}
+@media print{header,.bar,#t,.np{display:none!important}}
+</style></head><body><div id="app"></div><div id="t" hidden></div>
+<script>
+const sb=supabase.createClient('https://bkuhcxgmxrbjydkuklgo.supabase.co','sb_publishable_rjpYK53ugeDJrVoRo2B6mQ_5raQHAVU');
+const app=document.getElementById('app'),S={};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ST={draft:'Brouillon',validated:'Validé',published:'Publié',locked:'Verrouillé'};
+const f2=n=>n==null?'–':Number(n).toFixed(2);
+function toast(m,bad){const t=document.getElementById('t');t.textContent=m;t.className=bad?'bad':'';t.hidden=false;setTimeout(()=>t.hidden=true,3500)}
+const opts=(a,v,l,sel)=>a.map(x=>`<option value="${esc(x[v])}"${x[v]==sel?' selected':''}>${esc(l(x))}</option>`).join('');
+
+async function boot(){
+  const{data:{session}}=await sb.auth.getSession();if(!session)return login();
+  const{data:me}=await sb.from('profiles').select('*').eq('auth_user_id',session.user.id).maybeSingle();
+  if(!me){app.innerHTML='<main><div class="card">Aucun profil associé à ce compte.</div></main>';return}
+  S.me=me;S.admin=['admin','school_life'].includes(me.role);
+  S.teacher=(await sb.from('teachers').select('id').eq('profile_id',me.id).maybeSingle()).data;
+  const[tm,cl]=await Promise.all([sb.from('terms').select('id,name,term_number,status').order('term_number'),sb.from('classes').select('id,name,academic_year_id,levels(sort_order)')]);
+  S.terms=tm.data||[];S.classes=(cl.data||[]).sort((a,b)=>a.levels.sort_order-b.levels.sort_order||a.name.localeCompare(b.name));
+  S.term=(S.terms.find(t=>t.status==='active')||S.terms[0])?.id;S.cls=S.classes[0]?.id;
+  const tabs=[];if(S.admin)tabs.push(['dash','Tableau de bord']);if(S.teacher)tabs.push(['notes','Notes']);if(S.admin)tabs.push(['bul','Bulletins']);tabs.push(['edt','Emploi du temps']);
+  if(!S.admin&&!S.teacher){app.innerHTML='<main><div class="card">Espace élève / parent : bientôt disponible.</div></main>';return}
+  S.tabs=tabs;app.innerHTML=`<header><b>I2School · Lycée Mikolongo</b><nav>${tabs.map(t=>`<button data-t="${t[0]}">${t[1]}</button>`).join('')}</nav>
+  <span class="mu">${esc(me.first_name)} ${esc(me.last_name)} <span class="tag">${esc(me.role)}${S.teacher?' + enseignant':''}</span> <button id="lo">Quitter</button></span></header><main id="v"></main>`;
+  app.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.t));
+  document.getElementById('lo').onclick=async()=>{await sb.auth.signOut();location.reload()};go(tabs[0][0]);
+}
+function login(){
+  app.innerHTML=`<div class="card lg"><h2>I2School</h2><p class="mu">Lycée Mikolongo – connexion</p><input id="e" type="email" placeholder="Email" autocomplete="username"><input id="p" type="password" placeholder="Mot de passe" autocomplete="current-password"><button class="p" id="lgin" style="width:100%">Se connecter</button></div>`;
+  const run=async()=>{const{error}=await sb.auth.signInWithPassword({email:e.value.trim(),password:p.value});error?toast('Identifiants incorrects',1):boot()};
+  lgin.onclick=run;p.onkeydown=e=>e.key==='Enter'&&run();
+}
+function go(t){S.tab=t;app.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));({dash,notes,bul,edt})[t]()}
+const V=()=>document.getElementById('v');
+const clsSel=(id='cs')=>`<select id="${id}">${opts(S.classes,'id',c=>c.name,S.cls)}</select>`;
+const termSel=()=>`<select id="ts">${opts(S.terms,'id',t=>t.name,S.term)}</select>`;
+
+async function dash(){
+  V().innerHTML='<div class="card mu">Chargement…</div>';
+  const cnt=t=>sb.from(t).select('*',{count:'exact',head:true});
+  const[a,b,c,d,e,rc]=await Promise.all([cnt('students'),cnt('teachers'),cnt('classes'),cnt('parents'),cnt('assessments'),sb.from('report_cards').select('status')]);
+  const by={};(rc.data||[]).forEach(r=>by[r.status]=(by[r.status]||0)+1);
+  const k=(n,l)=>`<div class="card"><div class="k">${n??0}</div><div class="mu">${l}</div></div>`;
+  V().innerHTML=`<div class="grid">${k(a.count,'Élèves')}${k(b.count,'Enseignants')}${k(c.count,'Classes')}${k(d.count,'Parents')}${k(e.count,'Évaluations')}</div>
+  <div class="card"><b>Bulletins</b><div class="bar" style="margin-top:8px">${Object.keys(ST).map(s=>`<span class="tag">${ST[s]} : ${by[s]||0}</span>`).join('')}</div></div>`;
+}
+
+async function notes(){
+  const{data:as}=await sb.from('teacher_assignments').select('class_id,subject_id,classes(name),subjects(name)').eq('teacher_id',S.teacher.id);
+  S.as=(as||[]).map((x,i)=>({...x,i,l:`${x.classes.name} — ${x.subjects.name}`}));
+  V().innerHTML=`<div class="bar"><select id="as">${opts(S.as,'i',x=>x.l)}</select>${termSel()}</div><div id="ev"></div>`;
+  as_.onchange=ts.onchange=evList;S.term=ts.value;evList();
+}
+async function evList(){
+  S.term=ts.value;const x=S.as[as_.value];if(!x)return;
+  const{data}=await sb.from('assessments').select('id,title,assessment_date,status,max_score,coefficient').eq('class_id',x.class_id).eq('subject_id',x.subject_id).eq('term_id',S.term).order('assessment_date');
+  ev.innerHTML=`<div class="card sc"><table><tr><th>Évaluation</th><th>Date</th><th>Barème</th><th>Coef.</th><th>Statut</th><th></th></tr>${(data||[]).map(a=>`<tr><td>${esc(a.title)}</td><td>${esc(a.assessment_date)}</td><td>/${a.max_score}</td><td>${a.coefficient}</td><td><span class="tag">${esc(a.status)}</span></td><td><button data-a="${a.id}" data-l="${a.status==='locked'}">Saisir les notes</button></td></tr>`).join('')||'<tr><td class="mu">Aucune évaluation</td></tr>'}</table></div><div id="gr"></div>`;
+  ev.querySelectorAll('button[data-a]').forEach(b=>b.onclick=()=>grid(b.dataset.a,b.dataset.l==='true'));
+}
+async function grid(id,locked){
+  const{data,error}=await sb.from('assessment_results').select('id,assessment_id,student_id,score,status,students(first_name,last_name,student_number)').eq('assessment_id',id);
+  if(error)return toast(error.message,1);
+  const r=(data||[]).sort((a,b)=>a.students.last_name.localeCompare(b.students.last_name)||a.students.first_name.localeCompare(b.students.first_name));
+  gr.innerHTML=`<div class="card sc"><table><tr><th>Élève</th><th>Note</th><th>Statut</th></tr>${r.map(x=>`<tr data-id="${x.id}" data-a="${x.assessment_id}" data-s="${x.student_id}"><td>${esc(x.students.last_name)} ${esc(x.students.first_name)} <span class="mu">${esc(x.students.student_number)}</span></td>
+  <td><input type="number" min="0" step="0.25" value="${x.score??''}"${locked?' disabled':''}></td><td><select${locked?' disabled':''}>${['present','absent','excused','missing'].map(s=>`<option${s===x.status?' selected':''}>${s}</option>`).join('')}</select></td></tr>`).join('')}</table>
+  <div class="bar" style="margin:12px 0 0"><button class="p" id="sv"${locked?' disabled':''}>Enregistrer</button>${locked?'<span class="mu">Évaluation verrouillée</span>':''}</div></div>`;
+  sv.onclick=async()=>{const rows=[...gr.querySelectorAll('tr[data-id]')].map(t=>{const st=t.querySelector('select').value,v=t.querySelector('input').value;
+    return{id:t.dataset.id,assessment_id:t.dataset.a,student_id:t.dataset.s,status:st,score:st==='present'&&v!==''?Number(v):null}});
+    const{error}=await sb.from('assessment_results').upsert(rows);error?toast(error.message,1):toast('Notes enregistrées')};
+}
+const as_={get value(){return document.getElementById('as').value},set onchange(f){document.getElementById('as').onchange=f}};
+
+async function bul(){
+  V().innerHTML=`<div class="bar">${clsSel()}${termSel()}<button class="p" id="g">Générer</button><button data-n="validated">Valider</button><button data-n="published">Publier</button><button data-n="locked">Verrouiller</button><label class="mu"><input type="checkbox" id="fo"> forcer si incomplet</label></div><div id="bl"></div>`;
+  cs.onchange=ts.onchange=bList;
+  const rpc=async(fn,a,m)=>{const{data,error}=await sb.rpc(fn,a);error?toast(error.message,1):(toast(m(data)),bList())};
+  g.onclick=()=>rpc('generate_report_cards',{p_class_id:cs.value,p_term_id:ts.value},d=>`${d.bulletins_crees+d.bulletins_mis_a_jour} bulletins générés (${d.ignores_non_brouillon} ignorés)`);
+  document.querySelectorAll('button[data-n]').forEach(b=>b.onclick=()=>{if(b.dataset.n==='locked'&&!confirm('Verrouiller définitivement les bulletins ET les évaluations de cette classe ?'))return;
+    rpc('set_report_cards_status',{p_class_id:cs.value,p_term_id:ts.value,p_new_status:b.dataset.n,p_allow_incomplete:fo.checked},d=>`${d.bulletins_modifies} bulletins → ${ST[d.nouveau_statut]}`)});
+  bList();
+}
+async function bList(){
+  S.cls=cs.value;S.term=ts.value;
+  const{data}=await sb.from('report_cards').select('id,status,general_average,rank,class_average,class_size,students(first_name,last_name)').eq('class_id',S.cls).eq('term_id',S.term);
+  const r=(data||[]).sort((a,b)=>(a.rank??999)-(b.rank??999));
+  bl.innerHTML=`<div class="card sc"><table><tr><th>Rang</th><th>Élève</th><th>Moyenne</th><th>Statut</th></tr>${r.map(x=>`<tr class="cl" data-id="${x.id}"><td>${x.rank??'–'}/${x.class_size??''}</td><td>${esc(x.students.last_name)} ${esc(x.students.first_name)}</td><td><b>${f2(x.general_average)}</b></td><td><span class="tag">${ST[x.status]}</span></td></tr>`).join('')||'<tr><td class="mu">Aucun bulletin : cliquez sur « Générer ».</td></tr>'}</table></div><div id="bd"></div>`;
+  bl.querySelectorAll('tr.cl').forEach(t=>t.onclick=()=>bDetail(r.find(x=>x.id===t.dataset.id)));
+}
+async function bDetail(c){
+  const{data}=await sb.from('report_card_subjects').select('subject_average,coefficient,class_average,class_min,class_max,rank,subjects(name)').eq('report_card_id',c.id);
+  const r=(data||[]).sort((a,b)=>a.subjects.name.localeCompare(b.subjects.name));
+  bd.innerHTML=`<div class="card sc"><h3 style="margin-top:0">Bulletin – ${esc(c.students.first_name)} ${esc(c.students.last_name)}</h3><table><tr><th>Matière</th><th>Coef.</th><th>Moyenne</th><th>Classe</th><th>Min</th><th>Max</th><th>Rang</th></tr>${r.map(x=>`<tr><td>${esc(x.subjects.name)}</td><td>${x.coefficient}</td><td><b>${f2(x.subject_average)}</b></td><td>${f2(x.class_average)}</td><td>${f2(x.class_min)}</td><td>${f2(x.class_max)}</td><td>${x.rank??'–'}</td></tr>`).join('')}</table>
+  <p><b>Moyenne générale : ${f2(c.general_average)}</b> · rang ${c.rank??'–'}/${c.class_size??''} · moyenne de classe ${f2(c.class_average)}</p><button class="np" onclick="print()">Imprimer</button></div>`;
+  bd.scrollIntoView({behavior:'smooth'});
+}
+
+async function edt(){
+  const mine=S.teacher?'<option value="me">Mes cours</option>':'';
+  V().innerHTML=`<div class="bar"><select id="cs">${mine}${opts(S.classes,'id',c=>c.name,S.admin?S.cls:'')}</select></div><div id="tt"></div>`;
+  cs.onchange=ttLoad;ttLoad();
+}
+async function ttLoad(){
+  const me=cs.value==='me';let q=sb.from('timetable').select('day_of_week,start_time,end_time,subjects(name),teachers(last_name),classes(name),rooms(name)');
+  q=me?q.eq('teacher_id',S.teacher.id):q.eq('class_id',cs.value);const{data}=await q;
+  const slots=[...new Set((data||[]).map(x=>x.start_time))].sort(),D=['Lun','Mar','Mer','Jeu','Ven'];
+  tt.innerHTML=`<div class="card sc"><table><tr><th></th>${D.map(d=>`<th>${d}</th>`).join('')}</tr>${slots.map(s=>`<tr><th>${s.slice(0,5)}</th>${D.map((_,i)=>{const x=(data||[]).find(y=>y.start_time===s&&y.day_of_week===i+1);
+  return`<td>${x?`<b>${esc(x.subjects.name)}</b><br><span class="mu">${esc(me?x.classes.name:x.teachers.last_name)} · ${esc(x.rooms?.name||'')}</span>`:''}</td>`}).join('')}</tr>`).join('')}</table></div>`;
+}
+boot();
+</script></body></html>
