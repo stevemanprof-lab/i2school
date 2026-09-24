@@ -83,14 +83,31 @@ async function home(){
 }
 
 async function classes(){
- V().innerHTML='<div class="bar"><select id="classPick">'+opts(M.eclasses,'id',x=>x.name,M.cls)+'</select>'+(M.staff?'<button class="p" id="newStudent">+ Nouvel élève</button>':'')+'<button id="addExisting">Ajouter un élève existant</button></div><div id="roster"></div>';
- classPick.onchange=()=>{M.cls=classPick.value;roster()};if(M.staff)newStudent.onclick=()=>studentForm();addExisting.onclick=()=>existingStudentForm();roster()
+ V().innerHTML='<div class="bar"><select id="classPick"></select>'+(M.staff?'<button class="p" id="newStudentBtn">+ Nouvel élève</button>':'')+'<button id="addExistingBtnTop">Ajouter un élève existant</button></div><div id="rosterView"></div>';
+ const pick=document.getElementById('classPick');
+ pick.innerHTML=opts(M.eclasses,'id',x=>x.name,M.cls);
+ pick.value=M.cls||M.eclasses[0]?.id||'';
+ M.cls=pick.value;
+ pick.onchange=()=>{M.cls=pick.value;renderRoster()};
+ document.getElementById('newStudentBtn')?.addEventListener('click',studentForm);
+ document.getElementById('addExistingBtnTop').addEventListener('click',existingStudentForm);
+ await renderRoster();
 }
-async function roster(){
- M.cls=classPick.value;const {data,error}=await sb.rpc('get_managed_class_roster',{p_class_id:M.cls});if(error){roster.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
- roster.innerHTML='<div class="card sc"><div class="bar"><b>'+esc(M.eclasses.find(x=>x.id===M.cls)?.name||'Classe')+'</b><span class="tag">'+(data?.length||0)+' élèves</span></div><table><tr><th>#</th><th>Élève</th><th>Matricule</th><th>Accès</th><th></th></tr>'+(data||[]).map((x,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+esc(x.last_name)+' '+esc(x.first_name)+'</b><div class="mu">'+esc(x.email||'')+'</div></td><td>'+esc(x.student_number||'—')+'</td><td><span class="tag">'+(x.has_login?'Accès créé':'Pas encore d’accès')+'</span></td><td><button class="d" data-remove="'+x.student_id+'">Retirer</button></td></tr>').join('')+'</table></div>';
- roster.querySelectorAll('[data-remove]').forEach(b=>b.onclick=async()=>{if(!confirm('Retirer cet élève de la classe ? Son historique sera conservé.'))return;const {error}=await sb.rpc('remove_student_from_managed_class',{p_student_id:b.dataset.remove,p_class_id:M.cls,p_withdrawn_at:new Date().toISOString().slice(0,10)});error?toast(error.message,true):(toast('Élève retiré de la classe'),roster())})
+async function renderRoster(){
+ const pick=document.getElementById('classPick'); if(!pick)return;
+ M.cls=pick.value;
+ const box=document.getElementById('rosterView');
+ box.innerHTML='<div class="card empty">Chargement des élèves…</div>';
+ const {data,error}=await sb.rpc('get_managed_class_roster',{p_class_id:M.cls});
+ if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
+ box.innerHTML='<div class="card sc"><div class="bar"><b>'+esc(M.eclasses.find(x=>x.id===M.cls)?.name||'Classe')+'</b><span class="tag">'+(data?.length||0)+' élèves</span></div><table><tr><th>#</th><th>Élève</th><th>Matricule</th><th>Accès</th><th></th></tr>'+(data||[]).map((x,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+esc(x.last_name)+' '+esc(x.first_name)+'</b><div class="mu">'+esc(x.email||'')+'</div></td><td>'+esc(x.student_number||'—')+'</td><td><span class="tag">'+(x.has_login?'Accès créé':'Pas encore d’accès')+'</span></td><td><button class="d" data-remove-student="'+x.student_id+'">Retirer</button></td></tr>').join('')+'</table></div>';
+ box.querySelectorAll('[data-remove-student]').forEach(b=>b.addEventListener('click',async()=>{
+   if(!confirm('Retirer cet élève de la classe ? Son historique sera conservé.'))return;
+   const {error}=await sb.rpc('remove_student_from_managed_class',{p_student_id:b.dataset.removeStudent,p_class_id:M.cls,p_withdrawn_at:new Date().toISOString().slice(0,10)});
+   if(error)toast(error.message,true);else{toast('Élève retiré de la classe');await renderRoster()}
+ }));
 }
+function studentForm(){
 function studentForm(){
  modal('<button class="close" onclick="closeModal()">×</button><h2>Créer un élève</h2><p class="mu">Avec un e-mail, Supabase envoie une invitation. Sans e-mail, l’élève est inscrit sans accès.</p><div class="two"><div class="field"><label>Prénom *</label><input id="sf"></div><div class="field"><label>Nom *</label><input id="sl"></div><div class="field"><label>Matricule</label><input id="sn"></div><div class="field"><label>E-mail de l’élève</label><input id="se" type="email"></div><div class="field"><label>Téléphone</label><input id="sp"></div><div class="field"><label>Date de naissance</label><input id="sd" type="date"></div></div><div class="bar"><button onclick="closeModal()">Annuler</button><button class="p" id="createStudentBtn">Créer et inscrire</button></div>');
  createStudentBtn.onclick=async()=>{if(!sf.value.trim()||!sl.value.trim())return toast('Prénom et nom obligatoires',true);createStudentBtn.disabled=true;const {data,error}=await sb.functions.invoke('admin-create-student',{body:{first_name:sf.value.trim(),last_name:sl.value.trim(),student_number:sn.value.trim()||null,email:se.value.trim()||null,phone:sp.value.trim()||null,date_of_birth:sd.value||null,class_id:M.cls,enrolled_at:new Date().toISOString().slice(0,10)}});createStudentBtn.disabled=false;if(error){toast(error.message,true);return}closeModal();toast(data?.message||'Élève créé');roster()}
@@ -103,31 +120,78 @@ async function existingStudentForm(){
 
 async function notes(){
  if(!(M.staff||M.teacher))return learnerNotes();
- const {data:assign}=await sb.from('teacher_assignments').select('class_id,teacher_id,classes(name),subjects!inner(id,name,is_enabled)').eq('subject_id',M.english?.id).eq('subjects.is_enabled',true).eq('teacher_id',M.teacher?.id);
- M.noteClasses=M.staff?M.eclasses:(assign||[]).map(x=>x.classes);
- V().innerHTML='<div class="bar"><select id="noteClass">'+opts(M.noteClasses,'id',x=>x.name,M.cls)+'</select>'+termSelect()+'<button class="p" id="createEval">+ Nouvelle évaluation</button></div><div id="evalList"></div><div id="gradeBox"></div>';
- noteClass.onchange=()=>{M.cls=noteClass.value;refreshEvaluationList()};ts.onchange=refreshEvaluationList;refreshEvaluationList()
+ const classesForNotes=M.eclasses||[];
+ if(!classesForNotes.length){V().innerHTML='<div class="card empty">Aucune classe d’anglais ne vous est attribuée.</div>';return}
+ V().innerHTML='<div class="bar"><select id="noteClass"></select>'+termSelect()+'<button class="p" id="createEvalBtn">+ Nouvelle évaluation</button></div><div id="evalList"></div><div id="gradeBox"></div>';
+ const pick=document.getElementById('noteClass');
+ pick.innerHTML=opts(classesForNotes,'id',x=>x.name,M.cls);
+ pick.value=M.cls||classesForNotes[0].id;
+ M.cls=pick.value;
+ document.getElementById('ts').value=M.term||M.terms[0]?.id||'';
+ M.term=document.getElementById('ts').value;
+ pick.onchange=()=>{M.cls=pick.value;refreshEvaluationList()};
+ document.getElementById('ts').onchange=()=>{M.term=document.getElementById('ts').value;refreshEvaluationList()};
+ document.getElementById('createEvalBtn').addEventListener('click',()=>createEvaluation(pick.value,document.getElementById('ts').value));
+ await refreshEvaluationList();
 }
 function termSelect(){return '<select id="ts">'+opts(M.terms,'id',x=>x.name,M.term)+'</select>'}
 async function refreshEvaluationList(){
- M.cls=noteClass.value;M.term=ts.value;const {data,error}=await sb.from('assessments').select('id,title,assessment_date,max_score,coefficient,status').eq('class_id',M.cls).eq('term_id',M.term).eq('subject_id',M.english?.id).order('assessment_date',{ascending:false});
- if(error)return toast(error.message,true);
- document.getElementById('evalList').innerHTML='<div class="card sc"><table><tr><th>Évaluation</th><th>Date</th><th>Barème</th><th>Coef.</th><th>Statut</th><th></th></tr>'+(data||[]).map(a=>'<tr><td><b>'+esc(a.title)+'</b></td><td>'+esc(a.assessment_date||'')+'</td><td>/'+a.max_score+'</td><td>'+a.coefficient+'</td><td><span class="tag">'+ST[a.status]+'</span></td><td><button data-grade="'+a.id+'">Saisir</button></td></tr>').join('')+'</table></div>';
- document.getElementById('evalList').querySelectorAll('[data-grade]').forEach(b=>b.onclick=()=>gradeGrid(b.dataset.grade))
+ const classId=document.getElementById('noteClass')?.value||M.cls;
+ const termId=document.getElementById('ts')?.value||M.term;
+ M.cls=classId;M.term=termId;
+ const box=document.getElementById('evalList'); if(!box)return;
+ box.innerHTML='<div class="card empty">Chargement des évaluations…</div>';
+ const {data,error}=await sb.from('assessments').select('id,title,assessment_date,max_score,coefficient,status,assessment_type').eq('class_id',classId).eq('term_id',termId).eq('subject_id',M.english?.id).order('assessment_date',{ascending:false}).order('created_at',{ascending:false});
+ if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
+ box.innerHTML=data?.length?'<div class="card sc"><div class="bar"><b>Évaluations d’anglais</b><span class="tag">'+data.length+'</span></div><table><tr><th>Évaluation</th><th>Date</th><th>Type</th><th>Barème</th><th>Coef.</th><th>Statut</th><th></th></tr>'+data.map(a=>'<tr><td><b>'+esc(a.title)+'</b></td><td>'+esc(a.assessment_date||'')+'</td><td>'+esc(a.assessment_type||'—')+'</td><td>/'+a.max_score+'</td><td>'+a.coefficient+'</td><td><span class="tag">'+ST[a.status]+'</span></td><td><button data-grade-id="'+a.id+'">Saisir</button></td></tr>').join('')+'</table></div>':'<div class="card empty">Aucune évaluation d’anglais pour cette classe et ce trimestre.</div>';
+ box.querySelectorAll('[data-grade-id]').forEach(b=>b.addEventListener('click',()=>gradeGrid(b.dataset.gradeId)));
 }
-function createEvaluation(){ M.cls=document.getElementById('noteClass')?.value||M.cls;
- modal('<button class="close" onclick="closeModal()">×</button><h2>Nouvelle évaluation d’anglais</h2><div class="two"><div class="field"><label>Titre *</label><input id="et"></div><div class="field"><label>Date</label><input id="ed" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div><div class="field"><label>Barème</label><input id="em" type="number" min="1" value="20"></div><div class="field"><label>Coefficient</label><input id="ec" type="number" min=".01" step=".01" value="1"></div><div class="field"><label>Type</label><select id="etype"><option value="test">Test</option><option value="exam">Examen</option><option value="homework">Devoir</option><option value="oral">Oral</option><option value="project">Projet</option></select></div></div><div class="bar"><button onclick="closeModal()">Annuler</button><button class="p" id="saveEval">Créer</button></div>');
- saveEval.onclick=async()=>{if(!et.value.trim())return toast('Titre obligatoire',true);M.cls=document.getElementById('noteClass')?.value||M.cls;M.term=document.getElementById('ts')?.value||M.term;const teacherId=M.teacher?.id;if(!teacherId)return toast('Aucun profil enseignant lié à ce compte',true);const cls=M.eclasses.find(x=>x.id===M.cls);const {data:a,error}=await sb.from('assessments').insert({school_id:M.me.school_id,academic_year_id:cls.academic_year_id,term_id:M.term,class_id:M.cls,subject_id:M.english.id,teacher_id:teacherId,title:et.value.trim(),assessment_date:ed.value,max_score:Number(em.value),coefficient:Number(ec.value),assessment_type:etype.value,status:'draft'}).select('id').single();if(error){toast(error.message,true);return}const {data:en,error:e2}=await sb.from('enrollments').select('student_id').eq('class_id',M.cls).is('withdrawn_at',null);if(e2){toast(e2.message,true);return}if(en?.length){const {error:e3}=await sb.from('assessment_results').insert(en.map(x=>({assessment_id:a.id,student_id:x.student_id,score:null,status:'missing'})));if(e3)return toast(e3.message,true)}closeModal();toast('Évaluation créée');await refreshEvaluationList()}
+function createEvaluation(classId,termId){
+ const cls=M.eclasses.find(x=>x.id===classId);
+ if(!cls)return toast('Classe d’anglais introuvable.',true);
+ M.assessmentDraft={classId,termId,academicYearId:cls.academic_year_id};
+ modal('<button class="close" id="closeEvalModal">×</button><h2>Nouvelle évaluation d’anglais</h2><p class="mu">Classe : <b>'+esc(cls.name)+'</b> · '+esc(M.terms.find(t=>t.id===termId)?.name||'')+'</p><div class="two"><div class="field"><label>Titre *</label><input id="assessmentTitle"></div><div class="field"><label>Date</label><input id="assessmentDate" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div><div class="field"><label>Barème</label><input id="assessmentMax" type="number" min="0.01" step="0.01" value="20"></div><div class="field"><label>Coefficient</label><input id="assessmentCoef" type="number" min="0.01" step="0.01" value="1"></div><div class="field"><label>Type</label><select id="assessmentType"><option value="test">Test</option><option value="exam">Examen</option><option value="homework">Devoir</option><option value="oral">Oral</option><option value="project">Projet</option><option value="other">Autre</option></select></div></div><div class="bar"><button id="cancelEval">Annuler</button><button class="p" id="saveEvalBtn">Créer</button></div>');
+ document.getElementById('closeEvalModal').onclick=closeModal;
+ document.getElementById('cancelEval').onclick=closeModal;
+ document.getElementById('saveEvalBtn').onclick=async()=>{
+   const title=document.getElementById('assessmentTitle').value.trim();
+   const max=Number(document.getElementById('assessmentMax').value);
+   const coef=Number(document.getElementById('assessmentCoef').value);
+   if(!title)return toast('Le titre est obligatoire.',true);
+   if(!(max>0)||!(coef>0))return toast('Le barème et le coefficient doivent être supérieurs à 0.',true);
+   const btn=document.getElementById('saveEvalBtn');btn.disabled=true;
+   const {data,error}=await sb.rpc('create_english_assessment',{p_class_id:classId,p_term_id:termId,p_title:title,p_assessment_date:document.getElementById('assessmentDate').value||null,p_max_score:max,p_coefficient:coef,p_assessment_type:document.getElementById('assessmentType').value});
+   btn.disabled=false;
+   if(error){toast(error.message,true);return}
+   closeModal();
+   toast('Évaluation créée pour '+cls.name+'.');
+   await refreshEvaluationList();
+   if(data?.assessment_id)await gradeGrid(data.assessment_id);
+ };
 }
 async function gradeGrid(id){
- const {data,error}=await sb.from('assessment_results').select('id,student_id,score,status,students(first_name,last_name,student_number)').eq('assessment_id',id);if(error)return toast(error.message,true);
- const {data:ass}=await sb.from('assessments').select('status,max_score,title').eq('id',id).single();const locked=ass.status==='locked';
- gradeBox.innerHTML='<div class="card sc"><div class="bar"><b>'+esc(ass.title)+'</b><span class="tag">'+ST[ass.status]+'</span></div><table><tr><th>Élève</th><th>Note /'+ass.max_score+'</th><th>Statut</th></tr>'+(data||[]).sort((a,b)=>a.students.last_name.localeCompare(b.students.last_name)).map(x=>'<tr data-r="'+x.id+'"><td>'+esc(x.students.last_name)+' '+esc(x.students.first_name)+' <span class="mu">'+esc(x.students.student_number||'')+'</span></td><td><input type="number" min="0" max="'+ass.max_score+'" step=".25" value="'+(x.score??'')+'" '+(locked?'disabled':'')+'></td><td><select '+(locked?'disabled':'')+'>'+['present','absent','excused','missing'].map(s=>'<option '+(s===x.status?'selected':'')+'>'+s+'</option>').join('')+'</select></td></tr>').join('')+'</table><div class="bar"><button class="p" id="saveGrades" '+(locked?'disabled':'')+'>Enregistrer</button><button id="publishEval" '+(locked?'disabled':'')+'>Publier</button></div></div>';
- saveGrades.onclick=async()=>{const rows=[...gradeBox.querySelectorAll('tr[data-r]')].map(t=>{const s=t.querySelector('select').value,v=t.querySelector('input').value;return{id:t.dataset.r,score:s==='present'&&v!==''?Number(v):null,status:s}});const {error}=await sb.from('assessment_results').upsert(rows);error?toast(error.message,true):toast('Notes enregistrées')};
- publishEval.onclick=async()=>{const {error}=await sb.from('assessments').update({status:'published'}).eq('id',id);error?toast(error.message,true):(toast('Évaluation publiée'),gradeGrid(id),evalList())}
+ const box=document.getElementById('gradeBox');if(!box)return;
+ box.innerHTML='<div class="card empty">Chargement de la liste…</div>';
+ const [{data,error},{data:ass,error:ae}]=await Promise.all([
+  sb.from('assessment_results').select('id,student_id,score,status,students(first_name,last_name,student_number)').eq('assessment_id',id),
+  sb.from('assessments').select('id,status,max_score,title,assessment_type,assessment_date').eq('id',id).single()
+ ]);
+ if(error||ae){box.innerHTML='<div class="card">'+esc((error||ae).message)+'</div>';return}
+ const locked=ass.status==='locked';
+ const rows=(data||[]).sort((a,b)=>String(a.students?.last_name||'').localeCompare(String(b.students?.last_name||'')));
+ box.innerHTML='<div class="card sc"><div class="bar"><div style="margin-right:auto"><b>'+esc(ass.title)+'</b><div class="mu">'+esc(ass.assessment_date||'')+' · '+esc(ass.assessment_type||'')+' · /'+ass.max_score+'</div></div><span class="tag">'+ST[ass.status]+'</span></div><table><tr><th>Élève</th><th>Note /'+ass.max_score+'</th><th>Statut</th></tr>'+rows.map(x=>'<tr data-result-id="'+x.id+'"><td>'+esc(x.students?.last_name||'')+' '+esc(x.students?.first_name||'')+' <span class="mu">'+esc(x.students?.student_number||'')+'</span></td><td><input class="gradeValue" type="number" min="0" max="'+ass.max_score+'" step=".25" value="'+(x.score??'')+'" '+(locked?'disabled':'')+'></td><td><select class="gradeStatus" '+(locked?'disabled':'')+'>'+['present','absent','excused','missing'].map(s=>'<option value="'+s+'" '+(s===x.status?'selected':'')+'>'+s+'</option>').join('')+'</select></td></tr>').join('')+'</table><div class="bar"><button class="p" id="saveGradesBtn" '+(locked?'disabled':'')+'>Enregistrer les notes</button><button id="publishEvalBtn" '+(locked?'disabled':'')+'>Publier l’évaluation</button></div></div>';
+ document.getElementById('saveGradesBtn')?.addEventListener('click',async()=>{
+   const results=[...box.querySelectorAll('tr[data-result-id]')].map(tr=>{const status=tr.querySelector('.gradeStatus').value;const raw=tr.querySelector('.gradeValue').value;return{result_id:tr.dataset.resultId,score:status==='present'&&raw!==''?Number(raw):null,status}});
+   const btn=document.getElementById('saveGradesBtn');btn.disabled=true;
+   const {error}=await sb.rpc('save_english_assessment_results',{p_assessment_id:id,p_results:results});
+   btn.disabled=false;if(error)toast(error.message,true);else toast('Notes enregistrées.');
+ });
+ document.getElementById('publishEvalBtn')?.addEventListener('click',async()=>{
+   if(!confirm('Publier cette évaluation ? Les élèves pourront alors voir les résultats.'))return;
+   const {error}=await sb.rpc('publish_english_assessment',{p_assessment_id:id});
+   if(error)toast(error.message,true);else{toast('Évaluation publiée.');await refreshEvaluationList();await gradeGrid(id)}
+ });
 }
-document.addEventListener('click',e=>{if(e.target.id==='createEval')createEvaluation()});
-
 async function learnerNotes(){
  if(M.student){const {data}=await sb.from('assessment_results').select('score,status,assessments(title,assessment_date,max_score,coefficient,term_id,subjects!inner(name,is_enabled))').eq('student_id',M.student.id).eq('assessments.subject_id',M.english?.id).eq('assessments.status','published');renderLearnerNotes(data||[],M.student.first_name)}
  else{const kids=M.children||[];V().innerHTML='<div class="bar"><select id="kid">'+opts(kids,'id',x=>x.last_name+' '+x.first_name)+'</select></div><div id="kidNotes"></div>';kid.onchange=()=>parentNotes(kid.value);if(kids[0])parentNotes(kids[0].id)}
