@@ -338,27 +338,18 @@ function announcementForm(){
 async function inbox(){
  const {data,error}=await sb.from('messages').select('id,sender_profile_id,recipient_profile_id,student_id,subject,body,read_at,created_at,sender:profiles!messages_sender_profile_id_fkey(first_name,last_name,role)').or('sender_profile_id.eq.'+M.me.id+',recipient_profile_id.eq.'+M.me.id).order('created_at',{ascending:false}).limit(80);
  if(error)return toast(error.message,true);
- V().innerHTML='<div class="bar"><h2 style="margin-right:auto">Messages</h2><button class="p" id="newMsg">+ Nouveau message</button></div>'+(data||[]).map(x=>'<div class="msg '+(!x.read_at&&x.recipient_profile_id===M.me.id?'unread':'')+'"><div class="meta">'+esc(x.sender?.first_name||'')+' '+esc(x.sender?.last_name||'')+' · '+new Date(x.created_at).toLocaleString('fr-FR')+'</div><b>'+esc(x.subject)+'</b><p style="white-space:pre-wrap">'+esc(x.body)+'</p>'+(!x.read_at&&x.recipient_profile_id===M.me.id?'<button data-read="'+x.id+'">Marquer comme lu</button>':'')+'</div>').join('')||'<div class="card empty">Aucun message.</div>';
- document.querySelectorAll('[data-read]').forEach(b=>b.onclick=async()=>{await sb.from('messages').update({read_at:new Date().toISOString()}).eq('id',b.dataset.read);inbox()});newMsg.onclick=messageForm
+ V().innerHTML='<div class="bar"><h2 style="margin-right:auto">Messages</h2><button class="p" id="newMsg">+ Nouveau message</button></div>'+(data||[]).map(x=>'<div class="msg '+(!x.read_at&&x.recipient_profile_id===M.me.id?'unread':'')+'"><div class="meta">'+(x.recipient_profile_id===M.me.id?'De : ':'À : ')+esc(x.sender?.first_name||'')+' '+esc(x.sender?.last_name||'')+' · '+new Date(x.created_at).toLocaleString('fr-FR')+'</div><b>'+esc(x.subject)+'</b><p style="white-space:pre-wrap">'+esc(x.body)+'</p><div class="bar">'+(!x.read_at&&x.recipient_profile_id===M.me.id?'<button data-read="'+x.id+'">Marquer comme lu</button>':'')+'<button data-delete-msg="'+x.id+'">Supprimer pour moi</button></div></div>').join('')||'<div class="card empty">Aucun message.</div>';
+ document.querySelectorAll('[data-read]').forEach(b=>b.onclick=async()=>{const {error}=await sb.rpc('mark_message_read',{p_message_id:b.dataset.read});if(error)toast(error.message,true);else inbox()});
+ document.querySelectorAll('[data-delete-msg]').forEach(b=>b.onclick=async()=>{if(!confirm('Supprimer ce message pour vous ?'))return;const {error}=await sb.rpc('delete_my_message',{p_message_id:b.dataset.deleteMsg});if(error)toast(error.message,true);else{toast('Message supprimé pour vous.');inbox()}});
+ newMsg.onclick=messageForm
 }
 async function messageForm(){
  let recipients=[];
- if(M.staff||M.teacher){
-  const {data}=await sb.from('profiles').select('id,first_name,last_name,role').eq('school_id',M.me.school_id).in('role',['student','parent','teacher','school_life','admin']).order('last_name').limit(1000);recipients=data||[];
- }else if(M.student){
-  const {data,error}=await sb.rpc('get_my_english_message_recipients');
-  if(error){toast(error.message||'Impossible de charger les destinataires.',true);return}
-  recipients=data||[];
- }else{
-  let studentId=M.children?.[0]?.id;
-  if(studentId){
-   const {data:e}=await sb.from('enrollments').select('class_id').eq('student_id',studentId).is('withdrawn_at',null).limit(1).maybeSingle();
-   const {data:t}=await sb.from('teacher_assignments').select('teachers(profile_id)').eq('class_id',e?.class_id).eq('subject_id',M.english?.id).limit(1).maybeSingle();
-   if(t?.teachers?.profile_id){const p=await sb.from('profiles').select('id,first_name,last_name,role').eq('id',t.teachers.profile_id).single();recipients=p.data?[p.data]:[]}
-  }
- }
+ const {data,error}=await sb.rpc('get_my_message_recipients');
+ if(error){toast(error.message||'Impossible de charger les destinataires.',true);return}
+ recipients=data||[];
  if(!recipients.length)return toast('Aucun destinataire disponible',true);
- modal('<button class="close" onclick="closeModal()">×</button><h2>Nouveau message</h2><div class="field"><label>Destinataire</label><select id="mr">'+opts(recipients,'id',x=>x.first_name+' '+x.last_name+' · '+x.role)+'</select></div><div class="field"><label>Objet *</label><input id="ms"></div><div class="field"><label>Message *</label><textarea id="mb"></textarea></div><button class="p" id="sendMsg">Envoyer</button>');
+ modal('<button class="close" onclick="closeModal()">×</button><h2>Nouveau message</h2><div class="field"><label>Destinataire</label><select id="mr">'+opts(recipients,'profile_id',x=>x.first_name+' '+x.last_name+' · '+x.role+(x.class_name?' · '+x.class_name:''))+'</select></div><div class="field"><label>Objet *</label><input id="ms"></div><div class="field"><label>Message *</label><textarea id="mb"></textarea></div><button class="p" id="sendMsg">Envoyer</button>');
  sendMsg.onclick=async()=>{if(!ms.value.trim()||!mb.value.trim())return toast('Objet et message obligatoires',true);const {error}=await sb.from('messages').insert({school_id:M.me.school_id,sender_profile_id:M.me.id,recipient_profile_id:mr.value,student_id:M.student?.id||null,subject:ms.value.trim(),body:mb.value.trim()});if(error)toast(error.message,true);else{closeModal();toast('Message envoyé');inbox()}}
 }
 
