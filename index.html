@@ -113,9 +113,9 @@ function shell(tabs){
  document.getElementById('logout').onclick=async()=>{await sb.auth.signOut();location.reload()};
  document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.tab));go(tabs[0][0])
 }
-function staffShell(){shell([['home','Accueil'],['classes','Mes classes'],['access','Accès'],['notes','Notes'],['bulletins','Bulletins'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']])}
-function learnerShell(){shell([['home','Accueil'],['notes','Mes notes'],['bulletins','Mes bulletins'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']])}
-function go(t){M.tab=t;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));({home,classes,access,notes,bulletins,comms,inbox,edt}[t]?.())}
+function staffShell(){shell([['home','Accueil'],['classes','Mes classes'],['access','Accès'],['notes','Notes'],['bulletins','Bulletins'],['cahier','Cahier de textes'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']])}
+function learnerShell(){shell([['home','Accueil'],['notes','Mes notes'],['bulletins','Mes bulletins'],['cahier','Cahier de textes'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']])}
+function go(t){M.tab=t;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));({home,classes,access,notes,bulletins,cahier,comms,inbox,edt}[t]?.())}
 const V=()=>document.getElementById('view');
 
 async function home(){
@@ -353,6 +353,71 @@ async function messageForm(){
  sendMsg.onclick=async()=>{if(!ms.value.trim()||!mb.value.trim())return toast('Objet et message obligatoires',true);const {error}=await sb.from('messages').insert({school_id:M.me.school_id,sender_profile_id:M.me.id,recipient_profile_id:mr.value,student_id:M.student?.id||null,subject:ms.value.trim(),body:mb.value.trim()});if(error)toast(error.message,true);else{closeModal();toast('Message envoyé');inbox()}}
 }
 
+async function cahier(){
+ let classId=null;
+ if(M.student){
+  const q=await sb.from('enrollments').select('class_id,classes(name)').eq('student_id',M.student.id).is('withdrawn_at',null).order('enrolled_at',{ascending:false}).limit(1).maybeSingle();
+  classId=q.data?.class_id;
+ }else if(M.parent){
+  const children=M.children||[];
+  if(!children.length){
+   const q=await sb.from('parent_student').select('student_id,students(id,first_name,last_name)').eq('parent_id',M.parent.id);
+   M.children=(q.data||[]).map(x=>x.students).filter(Boolean);
+  }
+  if((M.children||[]).length>1){
+   const selected=prompt('Nom de l’élève à consulter :\n'+M.children.map(x=>x.first_name+' '+x.last_name).join('\n'));
+   const child=M.children.find(x=>(x.first_name+' '+x.last_name).toLowerCase()===String(selected||'').trim().toLowerCase());
+   if(!child)return;
+   const q=await sb.from('enrollments').select('class_id').eq('student_id',child.id).is('withdrawn_at',null).order('enrolled_at',{ascending:false}).limit(1).maybeSingle();classId=q.data?.class_id;
+  }else if(M.children?.[0]){
+   const q=await sb.from('enrollments').select('class_id').eq('student_id',M.children[0].id).is('withdrawn_at',null).order('enrolled_at',{ascending:false}).limit(1).maybeSingle();classId=q.data?.class_id;
+  }
+ }
+ const canManage=!!(M.staff||M.teacher);
+ if(canManage){
+  const classes=M.eclasses||[];
+  const clsOpts=classes.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('');
+  V().innerHTML='<div class="bar"><h2 style="margin-right:auto">Cahier de textes</h2><button class="p" id="addLesson">+ Cours</button><button id="addHomework">+ Devoir</button></div><div class="card"><div class="two"><div class="field"><label>Classe</label><select id="bookClass">'+clsOpts+'</select></div><div class="field"><label>Affichage</label><select id="bookFilter"><option value="all">Cours et devoirs</option><option value="lessons">Cours</option><option value="homework">Devoirs</option></select></div></div></div><div id="bookList"></div>';
+  const load=async()=>{
+   const cid=bookClass.value;
+   let lq=sb.from('lessons').select('id,lesson_date,title,content,classes(name),teachers(first_name,last_name)').eq('class_id',cid).order('lesson_date',{ascending:false}).limit(80);
+   let hq=sb.from('homework').select('id,due_date,title,description,classes(name),teachers(first_name,last_name)').eq('class_id',cid).order('due_date',{ascending:false}).limit(80);
+   const [lr,hr]=await Promise.all([lq,hq]);if(lr.error)return toast(lr.error.message,true);if(hr.error)return toast(hr.error.message,true);
+   const filter=bookFilter.value;let html='';
+   if(filter!=='homework')html+='<div class="card"><h3>Cours</h3>'+(lr.data||[]).map(x=>'<div class="msg"><div class="meta">'+esc(x.lesson_date||'')+' · '+esc(x.classes?.name||'')+'</div><b>'+esc(x.title)+'</b><p style="white-space:pre-wrap">'+esc(x.content||'')+'</p>'+((M.staff||M.teacher)?'<button data-del-lesson="'+x.id+'">Supprimer</button>':'')+'</div>').join('')||'<div class="empty">Aucun cours.</div>'+'</div>';
+   if(filter!=='lessons')html+='<div class="card"><h3>Devoirs</h3>'+(hr.data||[]).map(x=>'<div class="msg"><div class="meta">À rendre le '+esc(x.due_date||'')+' · '+esc(x.classes?.name||'')+'</div><b>'+esc(x.title)+'</b><p style="white-space:pre-wrap">'+esc(x.description||'')+'</p>'+((M.staff||M.teacher)?'<button data-del-homework="'+x.id+'">Supprimer</button>':'')+'</div>').join('')||'<div class="empty">Aucun devoir.</div>'+'</div>';
+   V().querySelector('#bookList').innerHTML=html||'<div class="card empty">Aucune entrée.</div>';
+   V().querySelectorAll('[data-del-lesson]').forEach(b=>b.onclick=async()=>{if(!confirm('Supprimer ce cours ?'))return;const {error}=await sb.from('lessons').delete().eq('id',b.dataset.delLesson);if(error)toast(error.message,true);else load()});
+   V().querySelectorAll('[data-del-homework]').forEach(b=>b.onclick=async()=>{if(!confirm('Supprimer ce devoir ?'))return;const {error}=await sb.from('homework').delete().eq('id',b.dataset.delHomework);if(error)toast(error.message,true);else load()});
+  };
+  bookClass.onchange=load;bookFilter.onchange=load;
+  addLesson.onclick=()=>cahierForm('lesson',bookClass.value,load);
+  addHomework.onclick=()=>cahierForm('homework',bookClass.value,load);
+  if(!classes.length){V().innerHTML='<div class="card empty">Aucune classe d’anglais disponible.</div>';return}
+  load();
+ }else{
+  if(!classId){V().innerHTML='<div class="card empty">Aucune classe active trouvée.</div>';return}
+  const [lr,hr]=await Promise.all([
+   sb.from('lessons').select('id,lesson_date,title,content,classes(name),teachers(first_name,last_name)').eq('class_id',classId).order('lesson_date',{ascending:false}).limit(80),
+   sb.from('homework').select('id,due_date,title,description,classes(name),teachers(first_name,last_name)').eq('class_id',classId).order('due_date',{ascending:false}).limit(80)
+  ]);
+  if(lr.error)return toast(lr.error.message,true);if(hr.error)return toast(hr.error.message,true);
+  V().innerHTML='<div class="card hero"><h2 style="margin:0">Cahier de textes</h2><p class="mu">Cours et devoirs d’anglais de votre classe.</p></div><div class="card"><h3>Cours</h3>'+((lr.data||[]).map(x=>'<div class="msg"><div class="meta">'+esc(x.lesson_date||'')+'</div><b>'+esc(x.title)+'</b><p style="white-space:pre-wrap">'+esc(x.content||'')+'</p></div>').join('')||'<div class="empty">Aucun cours.</div>')+'</div><div class="card"><h3>Devoirs</h3>'+((hr.data||[]).map(x=>'<div class="msg"><div class="meta">À rendre le '+esc(x.due_date||'')+'</div><b>'+esc(x.title)+'</b><p style="white-space:pre-wrap">'+esc(x.description||'')+'</p></div>').join('')||'<div class="empty">Aucun devoir.</div>')+'</div>';
+ }
+}
+async function cahierForm(kind,classId,refresh){
+ const title=kind==='lesson'?'Ajouter un cours':'Ajouter un devoir';
+ const html=kind==='lesson'?'<div class="field"><label>Date du cours *</label><input id="cfDate" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div><div class="field"><label>Titre *</label><input id="cfTitle" placeholder="Ex. Present Simple"></div><div class="field"><label>Contenu</label><textarea id="cfContent" placeholder="Résumé du cours, activités, travail réalisé..."></textarea></div>':'<div class="field"><label>Date limite *</label><input id="cfDate" type="date"></div><div class="field"><label>Titre *</label><input id="cfTitle" placeholder="Ex. Exercise on the Present Simple"></div><div class="field"><label>Consignes</label><textarea id="cfContent" placeholder="Travail à faire..."></textarea></div>';
+ modal('<button class="close" onclick="closeModal()">×</button><h2>'+title+'</h2>'+html+'<div class="bar"><button onclick="closeModal()">Annuler</button><button class="p" id="cfSave">Enregistrer</button></div>');
+ cfSave.onclick=async()=>{
+  if(!cfDate.value||!cfTitle.value.trim())return toast('Date et titre obligatoires',true);
+  const teacherId=M.teacher?.id;
+  if(!teacherId)return toast('Aucun profil enseignant associé à ce compte.',true);
+  let payload=kind==='lesson'?{school_id:M.me.school_id,academic_year_id:M.eclasses.find(x=>x.id===classId)?.academic_year_id,class_id:classId,subject_id:M.english.id,teacher_id:teacherId,lesson_date:cfDate.value,title:cfTitle.value.trim(),content:cfContent.value.trim()||null}:{school_id:M.me.school_id,academic_year_id:M.eclasses.find(x=>x.id===classId)?.academic_year_id,class_id:classId,subject_id:M.english.id,teacher_id:teacherId,due_date:cfDate.value,title:cfTitle.value.trim(),description:cfContent.value.trim()||null};
+  const {error}=await sb.from(kind==='lesson'?'lessons':'homework').insert(payload);
+  if(error)toast(error.message,true);else{closeModal();toast(kind==='lesson'?'Cours ajouté au cahier.':'Devoir ajouté au cahier.');refresh()}
+ };
+}
 async function edt(){
  let q=sb.from('timetable').select('day_of_week,start_time,end_time,subjects(name),teachers(last_name),classes(name),rooms(name)').order('start_time');
  if(M.teacher)q=q.eq('teacher_id',M.teacher.id);
