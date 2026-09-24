@@ -345,12 +345,17 @@ async function messageForm(){
  let recipients=[];
  if(M.staff||M.teacher){
   const {data}=await sb.from('profiles').select('id,first_name,last_name,role').eq('school_id',M.me.school_id).in('role',['student','parent','teacher','school_life','admin']).order('last_name').limit(1000);recipients=data||[];
+ }else if(M.student){
+  const {data,error}=await sb.rpc('get_my_english_message_recipients');
+  if(error){toast(error.message||'Impossible de charger les destinataires.',true);return}
+  recipients=data||[];
  }else{
-  let teacherProfile=null,studentId=M.student?.id;
-  if(!studentId&&M.children?.[0])studentId=M.children[0].id;
-  const {data:e}=await sb.from('enrollments').select('class_id').eq('student_id',studentId).is('withdrawn_at',null).limit(1).maybeSingle();
-  const {data:t}=await sb.from('teacher_assignments').select('teachers(profile_id),subjects!inner(id,name,is_enabled)').eq('class_id',e?.class_id).eq('subject_id',M.english?.id).eq('subjects.is_enabled',true).limit(1).maybeSingle();teacherProfile=t?.teachers?.profile_id;
-  if(teacherProfile){const p=await sb.from('profiles').select('id,first_name,last_name,role').eq('id',teacherProfile).single();recipients=p.data?[p.data]:[]}
+  let studentId=M.children?.[0]?.id;
+  if(studentId){
+   const {data:e}=await sb.from('enrollments').select('class_id').eq('student_id',studentId).is('withdrawn_at',null).limit(1).maybeSingle();
+   const {data:t}=await sb.from('teacher_assignments').select('teachers(profile_id)').eq('class_id',e?.class_id).eq('subject_id',M.english?.id).limit(1).maybeSingle();
+   if(t?.teachers?.profile_id){const p=await sb.from('profiles').select('id,first_name,last_name,role').eq('id',t.teachers.profile_id).single();recipients=p.data?[p.data]:[]}
+  }
  }
  if(!recipients.length)return toast('Aucun destinataire disponible',true);
  modal('<button class="close" onclick="closeModal()">×</button><h2>Nouveau message</h2><div class="field"><label>Destinataire</label><select id="mr">'+opts(recipients,'id',x=>x.first_name+' '+x.last_name+' · '+x.role)+'</select></div><div class="field"><label>Objet *</label><input id="ms"></div><div class="field"><label>Message *</label><textarea id="mb"></textarea></div><button class="p" id="sendMsg">Envoyer</button>');
