@@ -49,7 +49,7 @@ async function boot(){
 function login(){
   app.innerHTML=`<div class="card lg"><h2>I2School</h2><p class="mu">Lycée Mikolongo – connexion</p><input id="e" type="email" placeholder="Email" autocomplete="username"><input id="p" type="password" placeholder="Mot de passe" autocomplete="current-password"><button class="p" id="lgin" style="width:100%">Se connecter</button></div>`;
   const run=async()=>{const{error}=await sb.auth.signInWithPassword({email:e.value.trim(),password:p.value});error?toast('Identifiants incorrects',1):boot()};
-  lgin.onclick=run;p.onkeydown=e=>e.key==='Enter'&&run();
+  lgin.onclick=run;p.onkeydown=e=>{if(e.key==='Enter')run()};
 }
 function go(t){S.tab=t;app.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));({dash,notes,bul,edt})[t]()}
 const V=()=>document.getElementById('v');
