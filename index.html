@@ -61,9 +61,9 @@ function shell(tabs){
  document.getElementById('logout').onclick=async()=>{await sb.auth.signOut();location.reload()};
  document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.tab));go(tabs[0][0])
 }
-function staffShell(){shell([['home','Accueil'],['classes','Mes classes'],['notes','Notes'],['bulletins','Bulletins'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']])}
+function staffShell(){shell([['home','Accueil'],['classes','Mes classes'],['access','Accès'],['notes','Notes'],['bulletins','Bulletins'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']])}
 function learnerShell(){shell([['home','Accueil'],['notes','Mes notes'],['bulletins','Mes bulletins'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']])}
-function go(t){M.tab=t;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));({home,classes,notes,bulletins,comms,inbox,edt}[t]?.())}
+function go(t){M.tab=t;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));({home,classes,access,notes,bulletins,comms,inbox,edt}[t]?.())}
 const V=()=>document.getElementById('view');
 
 async function home(){
@@ -80,6 +80,50 @@ async function home(){
   if(M.student){const q=await sb.from('enrollments').select('class_id,classes(name,levels(name))').eq('student_id',M.student.id).is('withdrawn_at',null).order('enrolled_at',{ascending:false}).limit(1).maybeSingle();const c=q.data?.classes;V().innerHTML='<div class="card hero"><h2 style="margin:0">Espace Anglais</h2><p class="mu">Bonjour '+esc(M.student.first_name)+'. Voici votre suivi en anglais.</p></div><div class="card"><b>Classe</b><p>'+esc(c?.name||'')+' · '+esc(c?.levels?.name||'')+'</p></div>'}
   else{const q=await sb.from('parent_student').select('student_id,students(id,first_name,last_name)').eq('parent_id',M.parent.id);M.children=(q.data||[]).map(x=>x.students);V().innerHTML='<div class="card hero"><h2 style="margin:0">Espace Parent</h2><p class="mu">Suivi des élèves rattachés à votre compte — matière : anglais.</p></div><div class="card">'+(M.children||[]).map(x=>'<span class="tag" style="margin:4px">'+esc(x.first_name)+' '+esc(x.last_name)+'</span>').join('')+'</div>'}
  }
+}
+
+async function access(){
+ if(!M.staff){V().innerHTML='<div class="card">Accès réservé à l’administration.</div>';return}
+ const [st,pa]=await Promise.all([
+  sb.from('students').select('id,first_name,last_name,student_number,email,profile_id').order('last_name').limit(1000),
+  sb.from('parents').select('id,first_name,last_name,email,phone,profile_id').order('last_name').limit(1000)
+ ]);
+ if(st.error||pa.error){V().innerHTML='<div class="card">'+esc(st.error?.message||pa.error?.message||'Erreur de chargement')+'</div>';return}
+ const students=st.data||[], parents=pa.data||[];
+ V().innerHTML='<div class="card hero"><h2 style="margin:0 0 6px">Accès utilisateurs</h2><div class="mu">Créez un accès sécurisé pour un élève ou un parent. I2School envoie directement l’invitation par e-mail.</div></div>'+
+ '<div class="card sc"><div class="bar"><b>Élèves</b><span class="tag">'+students.length+' élèves</span></div>'+
+ '<table><tr><th>Élève</th><th>Matricule</th><th>E-mail</th><th>Accès</th><th></th></tr>'+
+ students.map(x=>'<tr><td><b>'+esc(x.last_name)+' '+esc(x.first_name)+'</b></td><td>'+esc(x.student_number||'—')+'</td><td>'+esc(x.email||'—')+'</td><td><span class="tag">'+(x.profile_id?'Accès créé':'Pas encore d’accès')+'</span></td><td>'+(x.profile_id?'<span class="mu">Déjà activé</span>':'<button data-grant="student" data-id="'+x.id+'">Donner un accès</button>')+'</td></tr>').join('')+
+ '</table></div>'+
+ '<div class="card sc"><div class="bar"><b>Parents</b><span class="tag">'+parents.length+' parents</span></div>'+
+ '<table><tr><th>Parent</th><th>Téléphone</th><th>E-mail</th><th>Accès</th><th></th></tr>'+
+ parents.map(x=>'<tr><td><b>'+esc(x.last_name)+' '+esc(x.first_name)+'</b></td><td>'+esc(x.phone||'—')+'</td><td>'+esc(x.email||'—')+'</td><td><span class="tag">'+(x.profile_id?'Accès créé':'Pas encore d’accès')+'</span></td><td>'+(x.profile_id?'<span class="mu">Déjà activé</span>':'<button data-grant="parent" data-id="'+x.id+'">Donner un accès</button>')+'</td></tr>').join('')+
+ '</table></div>';
+ V().querySelectorAll('[data-grant]').forEach(b=>b.onclick=()=>grantAccess(b.dataset.grant,b.dataset.id));
+}
+async function grantAccess(kind,id){
+ const label=kind==='student'?'élève':'parent';
+ const current=await (kind==='student'
+   ? sb.from('students').select('first_name,last_name,email,profile_id').eq('id',id).maybeSingle()
+   : sb.from('parents').select('first_name,last_name,email,profile_id').eq('id',id).maybeSingle());
+ if(current.error||!current.data){toast('Utilisateur introuvable',true);return}
+ if(current.data.profile_id){toast('Cet utilisateur possède déjà un accès.',true);return}
+ const email=prompt('Adresse e-mail de '+label+' '+current.data.first_name+' '+current.data.last_name+':',current.data.email||'');
+ if(email===null)return;
+ const clean=email.trim().toLowerCase();
+ if(!clean||!/^\S+@\S+\.\S+$/.test(clean)){toast('Adresse e-mail invalide.',true);return}
+ if(!confirm('Envoyer une invitation à '+clean+' ?'))return;
+ const {data,error}=await sb.functions.invoke('admin-invite-user',{body:{
+   email:clean,first_name:current.data.first_name,last_name:current.data.last_name,role:kind,school_id:M.me.school_id
+ }});
+ if(error){toast(error.message||'Invitation impossible',true);return}
+ const profileId=data?.profile?.id;
+ if(!profileId){toast('Invitation envoyée mais le profil n’a pas été retourné.',true);return}
+ const table=kind==='student'?'students':'parents';
+ const {error:linkError}=await sb.from(table).update({profile_id:profileId,email:clean}).eq('id',id);
+ if(linkError){toast('Compte créé mais liaison au dossier impossible : '+linkError.message,true);return}
+ toast('Invitation envoyée à '+clean);
+ access();
 }
 
 async function classes(){
@@ -110,7 +154,7 @@ async function renderRoster(){
 function studentForm(){
 
  modal('<button class="close" onclick="closeModal()">×</button><h2>Créer un élève</h2><p class="mu">Avec un e-mail, Supabase envoie une invitation. Sans e-mail, l’élève est inscrit sans accès.</p><div class="two"><div class="field"><label>Prénom *</label><input id="sf"></div><div class="field"><label>Nom *</label><input id="sl"></div><div class="field"><label>Matricule</label><input id="sn"></div><div class="field"><label>E-mail de l’élève</label><input id="se" type="email"></div><div class="field"><label>Téléphone</label><input id="sp"></div><div class="field"><label>Date de naissance</label><input id="sd" type="date"></div></div><div class="bar"><button onclick="closeModal()">Annuler</button><button class="p" id="createStudentBtn">Créer et inscrire</button></div>');
- createStudentBtn.onclick=async()=>{if(!sf.value.trim()||!sl.value.trim())return toast('Prénom et nom obligatoires',true);createStudentBtn.disabled=true;const {data,error}=await sb.functions.invoke('admin-create-student',{body:{first_name:sf.value.trim(),last_name:sl.value.trim(),student_number:sn.value.trim()||null,email:se.value.trim()||null,phone:sp.value.trim()||null,date_of_birth:sd.value||null,class_id:M.cls,enrolled_at:new Date().toISOString().slice(0,10)}});createStudentBtn.disabled=false;if(error){toast(error.message,true);return}closeModal();toast(data?.message||'Élève créé');roster()}
+ createStudentBtn.onclick=async()=>{if(!sf.value.trim()||!sl.value.trim())return toast('Prénom et nom obligatoires',true);createStudentBtn.disabled=true;const {data,error}=await sb.functions.invoke('admin-create-student',{body:{first_name:sf.value.trim(),last_name:sl.value.trim(),student_number:sn.value.trim()||null,email:se.value.trim()||null,phone:sp.value.trim()||null,date_of_birth:sd.value||null,class_id:M.cls,enrolled_at:new Date().toISOString().slice(0,10)}});createStudentBtn.disabled=false;if(error){toast(error.message,true);return}closeModal();toast(data?.message||'Élève créé');renderRoster()}
 }
 async function existingStudentForm(){
  const {data:students}=await sb.from('students').select('id,first_name,last_name,student_number').order('last_name').limit(1000);
