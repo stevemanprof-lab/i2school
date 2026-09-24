@@ -108,7 +108,7 @@ async function renderRoster(){
  }));
 }
 function studentForm(){
-function studentForm(){
+
  modal('<button class="close" onclick="closeModal()">×</button><h2>Créer un élève</h2><p class="mu">Avec un e-mail, Supabase envoie une invitation. Sans e-mail, l’élève est inscrit sans accès.</p><div class="two"><div class="field"><label>Prénom *</label><input id="sf"></div><div class="field"><label>Nom *</label><input id="sl"></div><div class="field"><label>Matricule</label><input id="sn"></div><div class="field"><label>E-mail de l’élève</label><input id="se" type="email"></div><div class="field"><label>Téléphone</label><input id="sp"></div><div class="field"><label>Date de naissance</label><input id="sd" type="date"></div></div><div class="bar"><button onclick="closeModal()">Annuler</button><button class="p" id="createStudentBtn">Créer et inscrire</button></div>');
  createStudentBtn.onclick=async()=>{if(!sf.value.trim()||!sl.value.trim())return toast('Prénom et nom obligatoires',true);createStudentBtn.disabled=true;const {data,error}=await sb.functions.invoke('admin-create-student',{body:{first_name:sf.value.trim(),last_name:sl.value.trim(),student_number:sn.value.trim()||null,email:se.value.trim()||null,phone:sp.value.trim()||null,date_of_birth:sd.value||null,class_id:M.cls,enrolled_at:new Date().toISOString().slice(0,10)}});createStudentBtn.disabled=false;if(error){toast(error.message,true);return}closeModal();toast(data?.message||'Élève créé');roster()}
 }
