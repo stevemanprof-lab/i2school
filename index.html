@@ -243,26 +243,35 @@ async function refreshEvaluationList(){
  box.querySelectorAll('[data-grade-id]').forEach(b=>b.addEventListener('click',()=>gradeGrid(b.dataset.gradeId)));
 }
 function createEvaluation(classId,termId){
- const cls=M.eclasses.find(x=>x.id===classId);
+ const cls=(M.eclasses||[]).find(x=>x.id===classId);
+ const term=(M.terms||[]).find(x=>x.id===termId);
  if(!cls)return toast('Classe d’anglais introuvable.',true);
+ if(!term)return toast('Trimestre introuvable.',true);
+ if(!M.english?.id)return toast('La matière Anglais n’est pas disponible.',true);
  M.assessmentDraft={classId,termId,academicYearId:cls.academic_year_id};
- modal('<button class="close" id="closeEvalModal">×</button><h2>Nouvelle évaluation d’anglais</h2><p class="mu">Classe : <b>'+esc(cls.name)+'</b> · '+esc(M.terms.find(t=>t.id===termId)?.name||'')+'</p><div class="two"><div class="field"><label>Titre *</label><input id="assessmentTitle"></div><div class="field"><label>Date</label><input id="assessmentDate" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div><div class="field"><label>Barème</label><input id="assessmentMax" type="number" min="0.01" step="0.01" value="20"></div><div class="field"><label>Coefficient</label><input id="assessmentCoef" type="number" min="0.01" step="0.01" value="1"></div><div class="field"><label>Type</label><select id="assessmentType"><option value="test">Test</option><option value="exam">Examen</option><option value="homework">Devoir</option><option value="oral">Oral</option><option value="project">Projet</option><option value="other">Autre</option></select></div></div><div class="bar"><button id="cancelEval">Annuler</button><button class="p" id="saveEvalBtn">Créer</button></div>');
+ modal('<button class="close" id="closeEvalModal">×</button><h2>Nouvelle évaluation d’anglais</h2><p class="mu">Classe : <b>'+esc(cls.name)+'</b> · '+esc(term.name)+'</p><div class="two"><div class="field"><label>Titre *</label><input id="assessmentTitle" autocomplete="off"></div><div class="field"><label>Date</label><input id="assessmentDate" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div><div class="field"><label>Barème</label><input id="assessmentMax" type="number" min="0.01" step="0.01" value="20"></div><div class="field"><label>Coefficient</label><input id="assessmentCoef" type="number" min="0.01" step="0.01" value="1"></div><div class="field"><label>Type</label><select id="assessmentType"><option value="test">Test</option><option value="exam">Examen</option><option value="homework">Devoir</option><option value="oral">Oral</option><option value="project">Projet</option><option value="other">Autre</option></select></div></div><div class="bar"><button id="cancelEval">Annuler</button><button class="p" id="saveEvalBtn">Créer l’évaluation</button></div>');
  document.getElementById('closeEvalModal').onclick=closeModal;
  document.getElementById('cancelEval').onclick=closeModal;
  document.getElementById('saveEvalBtn').onclick=async()=>{
    const title=document.getElementById('assessmentTitle').value.trim();
+   const date=document.getElementById('assessmentDate').value||null;
    const max=Number(document.getElementById('assessmentMax').value);
    const coef=Number(document.getElementById('assessmentCoef').value);
+   const type=document.getElementById('assessmentType').value;
    if(!title)return toast('Le titre est obligatoire.',true);
    if(!(max>0)||!(coef>0))return toast('Le barème et le coefficient doivent être supérieurs à 0.',true);
    const btn=document.getElementById('saveEvalBtn');btn.disabled=true;
-   const {data,error}=await sb.rpc('create_english_assessment',{p_class_id:classId,p_term_id:termId,p_title:title,p_assessment_date:document.getElementById('assessmentDate').value||null,p_max_score:max,p_coefficient:coef,p_assessment_type:document.getElementById('assessmentType').value});
-   btn.disabled=false;
-   if(error){toast(error.message,true);return}
-   closeModal();
-   toast('Évaluation créée pour '+cls.name+'.');
-   await refreshEvaluationList();
-   if(data?.assessment_id)await gradeGrid(data.assessment_id);
+   try{
+     const {data,error}=await sb.rpc('create_english_assessment',{p_class_id:classId,p_term_id:termId,p_title:title,p_assessment_date:date,p_max_score:max,p_coefficient:coef,p_assessment_type:type});
+     if(error)throw error;
+     if(!data?.assessment_id)throw new Error('L’évaluation n’a pas renvoyé d’identifiant. Aucun enregistrement de notes n’a été ouvert.');
+     closeModal();
+     toast('Évaluation créée pour '+cls.name+'.');
+     await refreshEvaluationList();
+     await gradeGrid(data.assessment_id);
+   }catch(e){
+     toast('Création impossible : '+(e?.message||'erreur inconnue'),true);
+   }finally{btn.disabled=false}
  };
 }
 async function gradeGrid(id){
