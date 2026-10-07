@@ -73,7 +73,7 @@ async function boot(){
  const {data:{session}}=await sb.auth.getSession();if(!session)return login();
  const {data:me,error}=await sb.from('profiles').select('*').eq('auth_user_id',session.user.id).maybeSingle();
  if(error||!me){app.innerHTML='<main><div class="card">Profil introuvable pour ce compte.</div></main>';return}
- M.me=me;M.staff=['admin','school_life'].includes(me.role);
+ M.me=me;M.staff=['admin','school_life'].includes(me.role);if(me.must_change_password){passwordForm('first');return;}
  M.teacher=(await sb.from('teachers').select('id,profile_id').eq('profile_id',me.id).maybeSingle()).data;
  M.student=(await sb.from('students').select('id,first_name,last_name,student_number').eq('profile_id',me.id).maybeSingle()).data;
  M.parent=(await sb.from('parents').select('id').eq('profile_id',me.id).maybeSingle()).data;
@@ -98,15 +98,33 @@ async function loadEnglishClasses(){
  M.eclasses=[...new Map(M.eclasses.map(x=>[x.id,x])).values()].sort((a,b)=>(a.levels?.sort_order||0)-(b.levels?.sort_order||0)||a.name.localeCompare(b.name));M.cls=M.eclasses[0]?.id;
 }
 function passwordForm(mode='reset'){
- app.innerHTML='<div class="loginwrap"><div class="card lg"><div class="hero card" style="margin:-16px -16px 16px;border:0"><h1 style="margin:0">I2School</h1><div class="mu">Sécurisation du compte</div></div><h2>Créer votre mot de passe</h2><p class="mu">Choisissez le mot de passe que vous utiliserez avec votre adresse e-mail pour les prochaines connexions.</p><div class="field"><label>Nouveau mot de passe *</label><input id="rp1" type="password" autocomplete="new-password" minlength="8"></div><div class="field"><label>Confirmer le mot de passe *</label><input id="rp2" type="password" autocomplete="new-password" minlength="8"></div><button class="p" id="rpBtn" style="width:100%">Enregistrer le mot de passe</button><p id="rpMsg" class="mu" style="margin-top:10px"></p></div></div>';
+ app.innerHTML='<div class="loginwrap"><div class="card lg"><div class="hero card" style="margin:-16px -16px 16px;border:0"><h1 style="margin:0">I2School</h1><div class="mu">Sécurisation du compte</div></div><h2>Créer votre mot de passe</h2><p class="mu">Choisissez le mot de passe personnel que vous utiliserez désormais avec votre identifiant I2School.</p><div class="field"><label>Nouveau mot de passe *</label><input id="rp1" type="password" autocomplete="new-password" minlength="8"></div><div class="field"><label>Confirmer le mot de passe *</label><input id="rp2" type="password" autocomplete="new-password" minlength="8"></div><button class="p" id="rpBtn" style="width:100%">Enregistrer le mot de passe</button><p id="rpMsg" class="mu" style="margin-top:10px"></p></div></div>';
  const run=async()=>{const p=rp1.value,p2=rp2.value;if(p.length<8)return toast('Le mot de passe doit contenir au moins 8 caractères.',true);if(p!==p2)return toast('Les deux mots de passe ne correspondent pas.',true);rpBtn.disabled=true;const {error}=await sb.auth.updateUser({password:p});rpBtn.disabled=false;if(error){toast(error.message||'Impossible d’enregistrer le mot de passe.',true);return}history.replaceState({},document.title,location.pathname+location.search);toast('Mot de passe enregistré. Vous pouvez maintenant vous reconnecter.');setTimeout(()=>{sb.auth.signOut().then(()=>login())},700)};
  rpBtn.onclick=run;rp2.onkeydown=e=>{if(e.key==='Enter')run()};
 }
+function identifierToEmail(identifier){
+ const id=String(identifier||'').trim().toLowerCase();
+ if(!id)return '';
+ if(id.includes('@'))return id;
+ if(id.startsWith('p-'))return id+'@parents.i2school.local';
+ return id+'@eleves.i2school.local';
+}
 function login(){
- app.innerHTML='<div class="loginwrap"><div class="card lg"><div class="hero card" style="margin:-16px -16px 16px;border:0"><h1 style="margin:0">I2School</h1><div class="mu">Espace Anglais · Lycée Mikolongo</div></div><h2>Connexion</h2><p class="mu">Élève, parent, enseignant ou administrateur</p><div class="field"><label>Adresse e-mail</label><input id="le" type="email" autocomplete="username"></div><div class="field"><label>Mot de passe</label><input id="lp" type="password" autocomplete="current-password"></div><button class="p" id="loginBtn" style="width:100%">Se connecter</button><button id="forgotBtn" style="width:100%;margin-top:8px">Première connexion / mot de passe oublié</button><p class="mu" style="margin-top:8px">Si vous avez reçu une invitation mais n’avez jamais créé de mot de passe, utilisez ce bouton.</p></div></div>';
- const run=async()=>{const {error}=await sb.auth.signInWithPassword({email:le.value.trim(),password:lp.value});if(error)toast('Identifiants incorrects',true);else location.reload()};
+ app.innerHTML='<div class="loginwrap"><div class="card lg"><div class="hero card" style="margin:-16px -16px 16px;border:0"><h1 style="margin:0">I2School</h1><div class="mu">Espace Anglais · Lycée Mikolongo</div></div><h2>Connexion</h2><p class="mu">Élève ou parent : utilisez votre <b>identifiant</b> (matricule). Les enseignants et administrateurs peuvent utiliser leur adresse e-mail.</p><div class="field"><label>Identifiant</label><input id="li" type="text" autocomplete="username" placeholder="Ex. 3E-M1-001 ou P-3E-M1-001"></div><div class="field"><label>Mot de passe</label><input id="lp" type="password" autocomplete="current-password"></div><button class="p" id="loginBtn" style="width:100%">Se connecter</button><button id="forgotBtn" style="width:100%;margin-top:8px">Première connexion / mot de passe oublié</button><p class="mu" style="margin-top:8px">À la première connexion, I2School vous demandera de choisir votre mot de passe personnel.</p></div></div>';
+ const run=async()=>{
+  const identifier=li.value.trim();
+  if(!identifier)return toast('Saisissez votre identifiant.',true);
+  const email=identifierToEmail(identifier);
+  const {error}=await sb.auth.signInWithPassword({email,password:lp.value});
+  if(error)toast('Identifiant ou mot de passe incorrect.',true);else location.reload()
+ };
  loginBtn.onclick=run;lp.onkeydown=e=>{if(e.key==='Enter')run()};
- forgotBtn.onclick=async()=>{const email=le.value.trim();if(!/^\\S+@\\S+\\.\\S+$/.test(email))return toast('Saisissez d’abord votre adresse e-mail.',true);const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:'https://i2school.netlify.app/'});if(error)toast(error.message||'Impossible d’envoyer le lien.',true);else toast('Un e-mail de création/réinitialisation du mot de passe a été envoyé.');};
+ forgotBtn.onclick=async()=>{
+  const identifier=li.value.trim();const email=identifierToEmail(identifier);
+  if(!email)return toast('Saisissez d’abord votre identifiant.',true);
+  const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:'https://i2school.netlify.app/'});
+  if(error)toast('Impossible d’envoyer le lien de réinitialisation.',true);else toast('Un lien de réinitialisation a été envoyé si le compte existe.');
+ };
 }
 function shell(tabs){
  app.innerHTML='<header><div class="brand">I2School <small>Lycée Mikolongo · Anglais</small></div><nav id="nav">'+tabs.map(x=>'<button data-tab="'+x[0]+'">'+x[1]+'</button>').join('')+'</nav><div><span class="tag">'+esc(M.me.role)+'</span> <button id="logout">Quitter</button></div></header><main id="view"></main>';
@@ -362,56 +380,74 @@ async function messageForm(){
  sendMsg.onclick=async()=>{if(!ms.value.trim()||!mb.value.trim())return toast('Objet et message obligatoires',true);const {error}=await sb.from('messages').insert({school_id:M.me.school_id,sender_profile_id:M.me.id,recipient_profile_id:mr.value,student_id:M.student?.id||null,subject:ms.value.trim(),body:mb.value.trim()});if(error)toast(error.message,true);else{closeModal();toast('Message envoyé');inbox()}}
 }
 
-async function cahier(){
- let classId=null;
+async function getLearnerClassId(){
  if(M.student){
-  const q=await sb.from('enrollments').select('class_id,classes(name)').eq('student_id',M.student.id).is('withdrawn_at',null).order('enrolled_at',{ascending:false}).limit(1).maybeSingle();
-  classId=q.data?.class_id;
- }else if(M.parent){
-  const children=M.children||[];
-  if(!children.length){
-   const q=await sb.from('parent_student').select('student_id,students(id,first_name,last_name)').eq('parent_id',M.parent.id);
-   M.children=(q.data||[]).map(x=>x.students).filter(Boolean);
-  }
-  if((M.children||[]).length>1){
-   const selected=prompt('Nom de l’élève à consulter :\n'+M.children.map(x=>x.first_name+' '+x.last_name).join('\n'));
-   const child=M.children.find(x=>(x.first_name+' '+x.last_name).toLowerCase()===String(selected||'').trim().toLowerCase());
-   if(!child)return;
-   const q=await sb.from('enrollments').select('class_id').eq('student_id',child.id).is('withdrawn_at',null).order('enrolled_at',{ascending:false}).limit(1).maybeSingle();classId=q.data?.class_id;
-  }else if(M.children?.[0]){
-   const q=await sb.from('enrollments').select('class_id').eq('student_id',M.children[0].id).is('withdrawn_at',null).order('enrolled_at',{ascending:false}).limit(1).maybeSingle();classId=q.data?.class_id;
-  }
+  const q=await sb.from('enrollments').select('class_id,classes(name,levels(name))').eq('student_id',M.student.id).is('withdrawn_at',null).order('enrolled_at',{ascending:false}).limit(1).maybeSingle();
+  return {classId:q.data?.class_id,child:M.student,className:q.data?.classes?.name};
  }
+ if(M.parent){
+  if(!M.children){const q=await sb.from('parent_student').select('student_id,students(id,first_name,last_name)').eq('parent_id',M.parent.id);M.children=(q.data||[]).map(x=>x.students).filter(Boolean)}
+  if(!M.children?.length)return {};
+  const id=M.children.length===1?M.children[0].id:(document.getElementById('cahierKid')?.value||M.children[0].id);
+  const child=M.children.find(x=>x.id===id)||M.children[0];
+  const q=await sb.from('enrollments').select('class_id,classes(name,levels(name))').eq('student_id',child.id).is('withdrawn_at',null).order('enrolled_at',{ascending:false}).limit(1).maybeSingle();
+  return {classId:q.data?.class_id,child,className:q.data?.classes?.name};
+ }
+ return {};
+}
+function formatDay(d){return d?new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}):''}
+async function cahier(){
  const canManage=!!(M.staff||M.teacher);
  if(canManage){
   const classes=M.eclasses||[];
-  const clsOpts=classes.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('');
-  V().innerHTML='<div class="bar"><h2 style="margin-right:auto">Cahier de textes</h2><button class="p" id="addLesson">+ Cours</button><button id="addHomework">+ Devoir</button></div><div class="card"><div class="two"><div class="field"><label>Classe</label><select id="bookClass">'+clsOpts+'</select></div><div class="field"><label>Affichage</label><select id="bookFilter"><option value="all">Cours et devoirs</option><option value="lessons">Cours</option><option value="homework">Devoirs</option></select></div></div></div><div id="bookList"></div>';
+  V().innerHTML='<div class="bar"><h2 style="margin-right:auto">Cahier de textes</h2><button class="p" id="addLesson">+ Cours</button><button id="addHomework">+ Devoir</button></div><div class="card"><div class="two"><div class="field"><label>Classe</label><select id="bookClass">'+classes.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('')+'</select></div><div class="field"><label>Filtre</label><select id="bookFilter"><option value="all">Tout</option><option value="lessons">Cours</option><option value="homework">Devoirs</option></select></div></div></div><div id="bookList"></div>';
   const load=async()=>{
    const cid=bookClass.value;
-   let lq=sb.from('lessons').select('id,lesson_date,title,content,classes(name),teachers(first_name,last_name)').eq('class_id',cid).order('lesson_date',{ascending:false}).limit(80);
-   let hq=sb.from('homework').select('id,due_date,title,description,classes(name),teachers(first_name,last_name)').eq('class_id',cid).order('due_date',{ascending:false}).limit(80);
-   const [lr,hr]=await Promise.all([lq,hq]);if(lr.error)return toast(lr.error.message,true);if(hr.error)return toast(hr.error.message,true);
-   const filter=bookFilter.value;let html='';
-   if(filter!=='homework')html+='<div class="card"><h3>Cours</h3>'+(lr.data||[]).map(x=>'<div class="msg"><div class="meta">'+esc(x.lesson_date||'')+' · '+esc(x.classes?.name||'')+'</div><b>'+esc(x.title)+'</b><p style="white-space:pre-wrap">'+esc(x.content||'')+'</p>'+((M.staff||M.teacher)?'<button data-del-lesson="'+x.id+'">Supprimer</button>':'')+'</div>').join('')||'<div class="empty">Aucun cours.</div>'+'</div>';
-   if(filter!=='lessons')html+='<div class="card"><h3>Devoirs</h3>'+(hr.data||[]).map(x=>'<div class="msg"><div class="meta">À rendre le '+esc(x.due_date||'')+' · '+esc(x.classes?.name||'')+'</div><b>'+esc(x.title)+'</b><p style="white-space:pre-wrap">'+esc(x.description||'')+'</p>'+((M.staff||M.teacher)?'<button data-del-homework="'+x.id+'">Supprimer</button>':'')+'</div>').join('')||'<div class="empty">Aucun devoir.</div>'+'</div>';
-   V().querySelector('#bookList').innerHTML=html||'<div class="card empty">Aucune entrée.</div>';
-   V().querySelectorAll('[data-del-lesson]').forEach(b=>b.onclick=async()=>{if(!confirm('Supprimer ce cours ?'))return;const {error}=await sb.from('lessons').delete().eq('id',b.dataset.delLesson);if(error)toast(error.message,true);else load()});
-   V().querySelectorAll('[data-del-homework]').forEach(b=>b.onclick=async()=>{if(!confirm('Supprimer ce devoir ?'))return;const {error}=await sb.from('homework').delete().eq('id',b.dataset.delHomework);if(error)toast(error.message,true);else load()});
+   const [lr,hr]=await Promise.all([
+    sb.from('lessons').select('id,lesson_date,title,content,classes(name),teachers(first_name,last_name)').eq('class_id',cid).order('lesson_date',{ascending:false}).order('created_at',{ascending:false}).limit(100),
+    sb.from('homework').select('id,due_date,title,description,classes(name),teachers(first_name,last_name)').eq('class_id',cid).order('due_date',{ascending:false}).limit(100)
+   ]);
+   if(lr.error)return toast(lr.error.message,true);if(hr.error)return toast(hr.error.message,true);
+   renderCahierTimeline(lr.data||[],hr.data||[],true);
   };
   bookClass.onchange=load;bookFilter.onchange=load;
-  addLesson.onclick=()=>cahierForm('lesson',bookClass.value,load);
-  addHomework.onclick=()=>cahierForm('homework',bookClass.value,load);
-  if(!classes.length){V().innerHTML='<div class="card empty">Aucune classe d’anglais disponible.</div>';return}
-  load();
+  addLesson.onclick=()=>cahierForm('lesson',bookClass.value,load);addHomework.onclick=()=>cahierForm('homework',bookClass.value,load);
+  if(!classes.length){V().innerHTML='<div class="card empty">Aucune classe d’anglais disponible.</div>';return}load();
  }else{
-  if(!classId){V().innerHTML='<div class="card empty">Aucune classe active trouvée.</div>';return}
-  const [lr,hr]=await Promise.all([
-   sb.from('lessons').select('id,lesson_date,title,content,classes(name),teachers(first_name,last_name)').eq('class_id',classId).order('lesson_date',{ascending:false}).limit(80),
-   sb.from('homework').select('id,due_date,title,description,classes(name),teachers(first_name,last_name)').eq('class_id',classId).order('due_date',{ascending:false}).limit(80)
-  ]);
-  if(lr.error)return toast(lr.error.message,true);if(hr.error)return toast(hr.error.message,true);
-  V().innerHTML='<div class="card hero"><h2 style="margin:0">Cahier de textes</h2><p class="mu">Cours et devoirs d’anglais de votre classe.</p></div><div class="card"><h3>Cours</h3>'+((lr.data||[]).map(x=>'<div class="msg"><div class="meta">'+esc(x.lesson_date||'')+'</div><b>'+esc(x.title)+'</b><p style="white-space:pre-wrap">'+esc(x.content||'')+'</p></div>').join('')||'<div class="empty">Aucun cours.</div>')+'</div><div class="card"><h3>Devoirs</h3>'+((hr.data||[]).map(x=>'<div class="msg"><div class="meta">À rendre le '+esc(x.due_date||'')+'</div><b>'+esc(x.title)+'</b><p style="white-space:pre-wrap">'+esc(x.description||'')+'</p></div>').join('')||'<div class="empty">Aucun devoir.</div>')+'</div>';
+  const info=await getLearnerClassId();
+  if(!info.classId){V().innerHTML='<div class="card empty">Aucune classe active trouvée.</div>';return}
+  if(M.parent&&M.children?.length>1){
+   const selector='<div class="field"><label>Élève</label><select id="cahierKid">'+opts(M.children,'id',x=>x.last_name+' '+x.first_name,info.child.id)+'</select></div>';
+   V().innerHTML=selector+'<div id="learnerCahier"></div>';
+   cahierKid.onchange=()=>loadLearnerCahier(cahierKid.value);await loadLearnerCahier(info.child.id);
+  }else{
+   V().innerHTML='<div id="learnerCahier"></div>';await loadLearnerCahier(info.child.id);
+  }
+ }
+}
+async function loadLearnerCahier(childId){
+ const q=await sb.from('enrollments').select('class_id,classes(name,levels(name))').eq('student_id',childId).is('withdrawn_at',null).order('enrolled_at',{ascending:false}).limit(1).maybeSingle();
+ const classId=q.data?.class_id;if(!classId){document.getElementById('learnerCahier').innerHTML='<div class="card empty">Aucune classe active trouvée.</div>';return}
+ const [lr,hr]=await Promise.all([
+  sb.from('lessons').select('id,lesson_date,title,content,classes(name),teachers(first_name,last_name)').eq('class_id',classId).order('lesson_date',{ascending:false}).limit(100),
+  sb.from('homework').select('id,due_date,title,description,classes(name),teachers(first_name,last_name)').eq('class_id',classId).order('due_date',{ascending:false}).limit(100)
+ ]);
+ if(lr.error)return toast(lr.error.message,true);if(hr.error)return toast(hr.error.message,true);
+ renderCahierTimeline(lr.data||[],hr.data||[],false,document.getElementById('learnerCahier'));
+}
+function renderCahierTimeline(lessons,homeworks,manage=false,target=null){
+ const filter=document.getElementById('bookFilter')?.value||'all';
+ const events=[];
+ if(filter!=='homework')lessons.forEach(x=>events.push({date:x.lesson_date,type:'lesson',id:x.id,title:x.title,body:x.content,teacher:x.teachers}));
+ if(filter!=='lessons')homeworks.forEach(x=>events.push({date:x.due_date,type:'homework',id:x.id,title:x.title,body:x.description,teacher:x.teachers}));
+ events.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+ const latest=events[0];
+ const html='<div class="card hero"><div style="font-size:12px;opacity:.85">CAHIER DE TEXTES · '+(latest?'DERNIÈRE ACTUALITÉ':'SUIVI DE LA CLASSE')+'</div><h2 style="margin:4px 0">'+(latest?esc(latest.title):'Aucune entrée')+'</h2><div class="mu">'+(latest?formatDay(latest.date):'')+'</div></div>'+
+ '<div class="card"><div class="bar"><b>Chronologie</b><span class="tag">'+events.length+' entrée(s)</span></div>'+events.map((x,i)=>'<div class="msg '+(i===0?'unread':'')+'" style="border-left:4px solid '+(x.type==='lesson'?'var(--ac)':'var(--yl)')+'"><div class="meta">'+formatDay(x.date)+' · '+(x.type==='lesson'?'COURS':'DEVOIR')+'</div><b>'+esc(x.title)+'</b><p style="white-space:pre-wrap;margin:6px 0">'+esc(x.body||'')+'</p>'+(x.teacher?'<div class="meta">Enseignant : '+esc((x.teacher.first_name||'')+' '+(x.teacher.last_name||''))+'</div>':'')+(manage?'<div class="bar" style="margin-top:8px">'+(x.type==='lesson'?'<button data-del-lesson="'+x.id+'">Supprimer</button>':'<button data-del-homework="'+x.id+'">Supprimer</button>')+'</div>':'')+'</div>').join('')+(events.length?'':'<div class="empty">Aucun cours ou devoir enregistré.</div>')+'</div>';
+ if(target)target.innerHTML=html;else V().querySelector('#bookList').innerHTML=html;
+ if(manage){
+  V().querySelectorAll('[data-del-lesson]').forEach(b=>b.onclick=async()=>{if(!confirm('Supprimer ce cours ?'))return;const {error}=await sb.from('lessons').delete().eq('id',b.dataset.delLesson);if(error)toast(error.message,true);else document.getElementById('bookClass')?.dispatchEvent(new Event('change'))});
+  V().querySelectorAll('[data-del-homework]').forEach(b=>b.onclick=async()=>{if(!confirm('Supprimer ce devoir ?'))return;const {error}=await sb.from('homework').delete().eq('id',b.dataset.delHomework);if(error)toast(error.message,true);else document.getElementById('bookClass')?.dispatchEvent(new Event('change'))});
  }
 }
 async function cahierForm(kind,classId,refresh){
@@ -428,11 +464,28 @@ async function cahierForm(kind,classId,refresh){
  };
 }
 async function edt(){
- let q=sb.from('timetable').select('day_of_week,start_time,end_time,subjects(name),teachers(last_name),classes(name),rooms(name)').order('start_time');
- if(M.teacher)q=q.eq('teacher_id',M.teacher.id);
- else if(M.student){const e=await sb.from('enrollments').select('class_id').eq('student_id',M.student.id).is('withdrawn_at',null).limit(1).maybeSingle();q=q.eq('class_id',e.data?.class_id)}
- else{V().innerHTML='<div class="card empty">L’emploi du temps détaillé sera affiché lorsque la classe sera sélectionnée.</div>';return}
- const {data,error}=await q;if(error)return toast(error.message,true);const days=['Lun','Mar','Mer','Jeu','Ven'];V().innerHTML='<div class="card sc"><h2>Emploi du temps</h2><table><tr><th>Jour</th><th>Heure</th><th>Matière</th><th>Classe</th><th>Salle</th></tr>'+(data||[]).map(x=>'<tr><td>'+days[(x.day_of_week||1)-1]+'</td><td>'+esc((x.start_time||'').slice(0,5))+'–'+esc((x.end_time||'').slice(0,5))+'</td><td>'+esc(x.subjects?.name||'')+'</td><td>'+esc(x.classes?.name||'')+'</td><td>'+esc(x.rooms?.name||'')+'</td></tr>').join('')+'</table></div>'
+ let classIds=[];
+ if(M.teacher)classIds=(M.eclasses||[]).map(x=>x.id);
+ else if(M.student){const e=await sb.from('enrollments').select('class_id').eq('student_id',M.student.id).is('withdrawn_at',null).limit(1).maybeSingle();if(e.data?.class_id)classIds=[e.data.class_id]}
+ else if(M.parent){
+  if(!M.children){const q=await sb.from('parent_student').select('student_id,students(id,first_name,last_name)').eq('parent_id',M.parent.id);M.children=(q.data||[]).map(x=>x.students).filter(Boolean)}
+  if(!M.children.length){V().innerHTML='<div class="card empty">Aucun élève rattaché à ce compte.</div>';return}
+  V().innerHTML='<div class="field"><label>Élève</label><select id="edtKid">'+opts(M.children,'id',x=>x.last_name+' '+x.first_name)+'</select></div><div id="edtBox"></div>';
+  edtKid.onchange=()=>loadLearnerEdt(edtKid.value);return loadLearnerEdt(M.children[0].id);
+ }else{V().innerHTML='<div class="card empty">Aucun emploi du temps disponible.</div>';return}
+ const {data,error}=await sb.from('timetable').select('day_of_week,start_time,end_time,subjects(name),teachers(last_name,first_name),classes(name),rooms(name)').in('class_id',classIds).order('day_of_week').order('start_time');
+ if(error)return toast(error.message,true);renderEdt(data||[],V());
+}
+async function loadLearnerEdt(studentId){
+ const e=await sb.from('enrollments').select('class_id,classes(name)').eq('student_id',studentId).is('withdrawn_at',null).limit(1).maybeSingle();
+ const box=document.getElementById('edtBox');if(!box)return;
+ if(!e.data?.class_id){box.innerHTML='<div class="card empty">Aucune classe active.</div>';return}
+ const {data,error}=await sb.from('timetable').select('day_of_week,start_time,end_time,subjects(name),teachers(last_name,first_name),classes(name),rooms(name)').eq('class_id',e.data.class_id).order('day_of_week').order('start_time');
+ if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}renderEdt(data||[],box);
+}
+function renderEdt(data,target){
+ const days=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+ target.innerHTML='<div class="card sc"><div class="bar"><h2 style="margin-right:auto">Emploi du temps</h2><span class="tag">'+(data.length||0)+' cours</span></div><table><tr><th>Jour</th><th>Horaire</th><th>Matière</th><th>Enseignant</th><th>Classe</th><th>Salle</th></tr>'+(data||[]).map(x=>'<tr><td><b>'+esc(days[(x.day_of_week||1)-1]||x.day_of_week)+'</b></td><td>'+esc((x.start_time||'').slice(0,5))+'–'+esc((x.end_time||'').slice(0,5))+'</td><td>'+esc(x.subjects?.name||'')+'</td><td>'+esc((x.teachers?.first_name||'')+' '+(x.teachers?.last_name||''))+'</td><td>'+esc(x.classes?.name||'')+'</td><td>'+esc(x.rooms?.name||'')+'</td></tr>').join('')+'</table>'+(data?.length?'':'<div class="empty">Aucun cours planifié.</div>')+'</div>';
 }
 boot();
 </script>
