@@ -4,13 +4,14 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>I2School — Espace Anglais</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{--bg:#f4f7f5;--card:#fff;--tx:#15201a;--mu:#68766e;--ac:#087a4b;--ac2:#0d5f8c;--yl:#e8b923;--bd:#dce5df;--er:#b3261e;--sh:0 8px 28px #173b2b10}
 *{box-sizing:border-box}body{margin:0;font:15px system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--tx)}
 button,input,select,textarea{font:inherit;border:1px solid var(--bd);border-radius:9px;background:var(--card);color:var(--tx);padding:9px 11px}button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color:#fff}button.b{background:var(--ac2);border-color:var(--ac2);color:#fff}button.d{color:var(--er)}button:disabled{opacity:.5;cursor:not-allowed}
 header{position:sticky;top:0;z-index:8;background:var(--card);border-bottom:1px solid var(--bd);padding:10px 18px;display:flex;align-items:center;gap:14px;justify-content:space-between}.brand{font-weight:800}.brand small{display:block;color:var(--mu);font-weight:500;font-size:11px}
 nav{display:flex;gap:5px;flex-wrap:wrap}nav button{border:0;background:transparent}nav button.on{background:var(--ac);color:#fff}
-main{max-width:1180px;margin:auto;padding:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;box-shadow:var(--sh);margin-bottom:14px}.hero{background:linear-gradient(135deg,#087a4b,#0d5f8c);color:#fff}.hero .mu{color:#e8f3ee}.k{font-size:28px;font-weight:800;color:var(--ac)}.mu{color:var(--mu);font-size:13px}.tag{display:inline-block;padding:3px 8px;border-radius:99px;background:#eef4f0;border:1px solid var(--bd);font-size:12px}.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.sc{overflow:auto}table{border-collapse:collapse;width:100%}th,td{padding:9px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:middle}th{font-size:12px;color:var(--mu)}tr.click{cursor:pointer}tr.click:hover{background:#f3f7f4}.empty{padding:24px;text-align:center;color:var(--mu)}textarea{width:100%;min-height:110px;resize:vertical}.field{display:grid;gap:5px;margin-bottom:10px}.field label{font-size:12px;color:var(--mu);font-weight:650}.modal{position:fixed;inset:0;background:#10201966;display:none;align-items:center;justify-content:center;z-index:20;padding:18px}.modal.show{display:flex}.modal>div{max-width:680px;width:100%;max-height:90vh;overflow:auto}.close{float:right}.msg{padding:12px;border:1px solid var(--bd);border-radius:10px;margin:8px 0}.msg.unread{border-left:4px solid var(--ac);background:#f3faf6}.msg .meta{font-size:12px;color:var(--mu)}#toastRoot{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#173a2a;color:white;padding:11px 17px;border-radius:10px;z-index:30;box-shadow:var(--sh)}#toast.bad{background:var(--er)}.lg{max-width:390px;margin:13vh auto}.loginwrap{min-height:100vh;display:grid;place-items:center;padding:18px}.loginwrap .card{width:100%}.accent{color:var(--ac)}@media(max-width:900px){header{position:static;flex-wrap:wrap;align-items:center}.brand{min-width:auto;flex:0 0 auto}nav{width:100%;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;justify-content:flex-start;padding-bottom:2px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}nav button{flex:0 0 auto;white-space:nowrap}.two{grid-template-columns:1fr}main{padding:12px}}@media print{header,.np,#toastRoot{display:none!important}.card{box-shadow:none}}
+main{max-width:1180px;margin:auto;padding:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;box-shadow:var(--sh);margin-bottom:14px}.hero{background:linear-gradient(135deg,#087a4b,#0d5f8c);color:#fff}.hero .mu{color:#e8f3ee}.k{font-size:28px;font-weight:800;color:var(--ac)}.mu{color:var(--mu);font-size:13px}.tag{display:inline-block;padding:3px 8px;border-radius:99px;background:#eef4f0;border:1px solid var(--bd);font-size:12px}.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.sc{overflow:auto}table{border-collapse:collapse;width:100%}th,td{padding:9px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:middle}th{font-size:12px;color:var(--mu)}tr.click{cursor:pointer}tr.click:hover{background:#f3f7f4}.empty{padding:24px;text-align:center;color:var(--mu)}textarea{width:100%;min-height:110px;resize:vertical}.field{display:grid;gap:5px;margin-bottom:10px}.field label{font-size:12px;color:var(--mu);font-weight:650}.modal{position:fixed;inset:0;background:#10201966;display:none;align-items:center;justify-content:center;z-index:20;padding:18px}.modal.show{display:flex}.modal>div{max-width:680px;width:100%;max-height:90vh;overflow:auto}.close{float:right}.msg{padding:12px;border:1px solid var(--bd);border-radius:10px;margin:8px 0}.msg.unread{border-left:4px solid var(--ac);background:#f3faf6}.msg .meta{font-size:12px;color:var(--mu)}#toastRoot{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#173a2a;color:white;padding:11px 17px;border-radius:10px;z-index:30;box-shadow:var(--sh)}#toast.bad{background:var(--er)}.lg{max-width:390px;margin:13vh auto}.loginwrap{min-height:100vh;display:grid;place-items:center;padding:18px}.loginwrap .card{width:100%}.accent{color:var(--ac)}@media(max-width:900px){header{position:static;flex-wrap:wrap;align-items:center}.brand{min-width:auto;flex:0 0 auto}nav{width:100%;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;justify-content:flex-start;padding-bottom:2px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}nav button{flex:0 0 auto;white-space:nowrap}.two{grid-template-columns:1fr}main{padding:12px}}@media print{header,.np,#toastRoot,.bar button,.bar select{display:none!important}.card{box-shadow:none}.sc{overflow:visible!important}table{font-size:11px}#mxTable th,#mxTable td{padding:4px 6px}}
 </style>
 </head>
 <body><div id="app"></div><div id="toastRoot" hidden></div><div id="modalRoot" class="modal"><div class="card" id="modalBody"></div></div>
@@ -131,9 +132,9 @@ function shell(tabs){
  document.getElementById('logout').onclick=async()=>{await sb.auth.signOut();location.reload()};
  document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.tab));go(tabs[0][0])
 }
-function staffShell(){shell([['home','Accueil'],['classes','Mes classes'],['access','Accès'],['notes','Notes'],['bulletins','Bulletins'],['cahier','Cahier de textes'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']])}
-function learnerShell(){shell([['home','Accueil'],['notes','Mes notes'],['bulletins','Mes bulletins'],['cahier','Cahier de textes'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']])}
-function go(t){M.tab=t;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));({home,classes,access,notes,bulletins,cahier,comms,inbox,edt}[t]?.())}
+function staffShell(){shell([['home','Accueil'],['classes','Mes classes'],['access','Accès'],['notes','Notes'],['matrix','Tableau de notes'],['quizzes','Quiz'],['bulletins','Bulletins'],['cahier','Cahier de textes'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']])}
+function learnerShell(){shell([['home','Accueil'],['notes','Mes notes'],['quizzes','Quiz'],['bulletins','Mes bulletins'],['cahier','Cahier de textes'],['comms','Informations'],['inbox','Messages'],['edt','Emploi du temps']])}
+function go(t){M.tab=t;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));({home,classes,access,notes,matrix,quizzes,bulletins,cahier,comms,inbox,edt}[t]?.())}
 const V=()=>document.getElementById('view');
 
 async function home(){
@@ -314,6 +315,197 @@ async function gradeGrid(id){
    const {error}=await sb.rpc('publish_english_assessment',{p_assessment_id:id});
    if(error)toast(error.message,true);else{toast('Évaluation publiée.');await refreshEvaluationList();await gradeGrid(id)}
  });
+}
+async function matrix(){
+ if(!(M.staff||M.teacher))return;
+ const classesForNotes=M.eclasses||[];
+ if(!classesForNotes.length){V().innerHTML='<div class="card empty">Aucune classe d’anglais ne vous est attribuée.</div>';return}
+ V().innerHTML='<div class="bar"><select id="mxClass"></select><select id="mxTerm"></select><button id="mxXlsx">Télécharger Excel</button><button id="mxPdf">Imprimer / PDF</button></div><div id="mxBox"></div>';
+ const pick=document.getElementById('mxClass');pick.innerHTML=opts(classesForNotes,'id',x=>x.name,M.cls);pick.value=M.cls||classesForNotes[0].id;M.cls=pick.value;
+ const tpick=document.getElementById('mxTerm');tpick.innerHTML=opts(M.terms,'id',x=>x.name,M.term);tpick.value=M.term||M.terms[0]?.id||'';M.term=tpick.value;
+ pick.onchange=()=>{M.cls=pick.value;renderMatrix()};
+ tpick.onchange=()=>{M.term=tpick.value;renderMatrix()};
+ await renderMatrix();
+}
+async function renderMatrix(){
+ const box=document.getElementById('mxBox');if(!box)return;
+ box.innerHTML='<div class="card empty">Chargement…</div>';
+ const classId=M.cls,termId=M.term;
+ const [{data:students,error:se},{data:assess,error:ae},{data:avgs,error:ge}]=await Promise.all([
+  sb.from('enrollments').select('student_id,students(id,first_name,last_name,student_number)').eq('class_id',classId).is('withdrawn_at',null),
+  sb.from('assessments').select('id,title,assessment_date,max_score,status').eq('class_id',classId).eq('term_id',termId).eq('subject_id',M.english?.id).order('assessment_date',{ascending:true}).order('created_at',{ascending:true}),
+  sb.from('v_subject_term_averages').select('student_id,moyenne,moyenne_classe').eq('class_id',classId).eq('term_id',termId)
+ ]);
+ if(se||ae||ge){box.innerHTML='<div class="card">'+esc((se||ae||ge).message)+'</div>';return}
+ const stuList=(students||[]).map(x=>x.students).filter(Boolean).sort((a,b)=>String(a.last_name).localeCompare(String(b.last_name)));
+ if(!assess?.length){box.innerHTML='<div class="card empty">Aucune évaluation d’anglais pour cette classe et ce trimestre.</div>';return}
+ const assIds=assess.map(a=>a.id);
+ const {data:results,error:re}=await sb.from('assessment_results').select('assessment_id,student_id,score,status').in('assessment_id',assIds);
+ if(re){box.innerHTML='<div class="card">'+esc(re.message)+'</div>';return}
+ const byCell={};(results||[]).forEach(r=>{byCell[r.assessment_id+'|'+r.student_id]=r});
+ const avgByStudent={};(avgs||[]).forEach(a=>{avgByStudent[a.student_id]=a});
+ const classAvgGeneral=(avgs&&avgs[0])?avgs[0].moyenne_classe:null;
+
+ const colAvg=assess.map(a=>{
+  const scores=stuList.map(s=>byCell[a.id+'|'+s.id]).filter(r=>r&&r.status==='present'&&r.score!=null).map(r=>Number(r.score));
+  return scores.length?scores.reduce((x,y)=>x+y,0)/scores.length:null;
+ });
+
+ let html='<p class="mu">Seules les évaluations publiées ou verrouillées comptent dans la moyenne (les brouillons sont affichés mais non comptés).</p><div class="card sc"><table id="mxTable"><tr><th>Élève</th>'+assess.map(a=>'<th>'+esc(a.title)+'<div class="mu">'+esc(a.assessment_date||'')+(a.status==='draft'?' · brouillon':'')+'</div></th>').join('')+'<th>Moyenne</th></tr>';
+ stuList.forEach(s=>{
+  html+='<tr><td>'+esc(s.last_name)+' '+esc(s.first_name)+'<div class="mu">'+esc(s.student_number||'')+'</div></td>';
+  assess.forEach(a=>{
+   const r=byCell[a.id+'|'+s.id];
+   html+='<td>'+(r?(r.status==='present'?money(r.score)+'/'+a.max_score:r.status):'—')+'</td>';
+  });
+  const av=avgByStudent[s.id];
+  html+='<td><b>'+(av&&av.moyenne!=null?money(av.moyenne):'—')+'</b></td></tr>';
+ });
+ html+='<tr><td><b>Moyenne de classe</b></td>'+colAvg.map(v=>'<td><b>'+(v!=null?money(v):'—')+'</b></td>').join('')+'<td><b>'+(classAvgGeneral!=null?money(classAvgGeneral):'—')+'</b></td></tr>';
+ html+='</table></div>';
+ box.innerHTML=html;
+
+ document.getElementById('mxPdf').onclick=()=>window.print();
+ document.getElementById('mxXlsx').onclick=()=>{
+  if(typeof XLSX==='undefined')return toast('La bibliothèque Excel ne s’est pas chargée. Vérifiez votre connexion.',true);
+  const wb=XLSX.utils.table_to_book(document.getElementById('mxTable'),{sheet:'Notes'});
+  const clsName=(M.eclasses||[]).find(x=>x.id===classId)?.name||'classe';
+  const termName=(M.terms||[]).find(x=>x.id===termId)?.name||'trimestre';
+  XLSX.writeFile(wb,'Notes_'+clsName.replace(/\s+/g,'_')+'_'+termName.replace(/\s+/g,'_')+'.xlsx');
+ };
+}
+function parseMoodleXml(xmlText){
+ const doc=new DOMParser().parseFromString(xmlText,'application/xml');
+ if(doc.querySelector('parsererror'))throw new Error('Fichier XML invalide.');
+ const questions=[...doc.querySelectorAll('question')].filter(q=>q.getAttribute('type')==='multichoice').map(q=>{
+  const qtext=(q.querySelector('questiontext > text')?.textContent||'').trim();
+  const choices=[...q.querySelectorAll('answer')].map(a=>({
+   text:(a.querySelector('text')?.textContent||'').trim(),
+   is_correct:parseFloat(a.getAttribute('fraction')||'0')>0
+  })).filter(c=>c.text);
+  return{question_text:qtext,points:1,choices};
+ }).filter(q=>q.question_text&&q.choices.length>=2&&q.choices.some(c=>c.is_correct));
+ if(!questions.length)throw new Error('Aucune question à choix unique exploitable dans ce fichier.');
+ return questions;
+}
+async function quizzes(){if(M.staff||M.teacher)return staffQuizzes();return learnerQuizzes()}
+async function staffQuizzes(){
+ const classesForNotes=M.eclasses||[];
+ if(!classesForNotes.length){V().innerHTML='<div class="card empty">Aucune classe d’anglais ne vous est attribuée.</div>';return}
+ V().innerHTML='<div class="bar"><select id="qzClass"></select><select id="qzTerm"></select><button id="qzNew" class="p">+ Créer un quiz</button><button id="qzImport">Importer (XML Moodle)</button><input type="file" id="qzFile" accept=".xml" style="display:none"></div><div id="qzList"></div><div id="qzBuilder"></div>';
+ const pick=document.getElementById('qzClass');pick.innerHTML=opts(classesForNotes,'id',x=>x.name,M.cls);pick.value=M.cls||classesForNotes[0].id;M.cls=pick.value;
+ const tpick=document.getElementById('qzTerm');tpick.innerHTML=opts(M.terms,'id',x=>x.name,M.term);tpick.value=M.term||M.terms[0]?.id||'';M.term=tpick.value;
+ pick.onchange=()=>{M.cls=pick.value;document.getElementById('qzBuilder').innerHTML='';refreshQuizList()};
+ tpick.onchange=()=>{M.term=tpick.value};
+ document.getElementById('qzNew').onclick=()=>showQuizBuilder();
+ document.getElementById('qzImport').onclick=()=>document.getElementById('qzFile').click();
+ document.getElementById('qzFile').onchange=async(e)=>{
+  const file=e.target.files[0];if(!file)return;
+  try{
+   const text=await file.text();
+   const questions=parseMoodleXml(text);
+   const title=prompt('Titre du quiz ?',file.name.replace(/\.xml$/i,''));
+   if(!title){e.target.value='';return}
+   const{error}=await sb.rpc('create_quiz_with_questions',{p_class_id:M.cls,p_term_id:M.term,p_title:title,p_questions:questions,p_source:'import_moodle_xml'});
+   if(error)return toast(error.message,true);
+   toast(questions.length+' question(s) importée(s) en brouillon.');
+   refreshQuizList();
+  }catch(err){toast(err.message,true)}
+  e.target.value='';
+ };
+ await refreshQuizList();
+}
+async function refreshQuizList(){
+ const box=document.getElementById('qzList');if(!box)return;
+ box.innerHTML='<div class="card empty">Chargement…</div>';
+ const{data,error}=await sb.from('v_quiz_overview').select('*').eq('class_id',M.cls).order('title');
+ if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
+ if(!data?.length){box.innerHTML='<div class="card empty">Aucun quiz pour cette classe.</div>';return}
+ box.innerHTML='<div class="card sc"><table><tr><th>Titre</th><th>Statut</th><th>Soumis</th><th>Score moyen</th><th></th></tr>'+data.map(q=>'<tr><td>'+esc(q.title)+'</td><td><span class="tag">'+esc(q.status)+'</span></td><td>'+q.nb_soumises+'/'+q.nb_tentatives+'</td><td>'+(q.score_moyen!=null?q.score_moyen+'/'+q.score_max:'—')+'</td><td>'
+  +(q.status==='draft'?'<button data-pub="'+q.quiz_id+'">Publier</button> <button data-del="'+q.quiz_id+'">Supprimer</button>':'')
+  +(q.status==='published'?'<button data-lock="'+q.quiz_id+'">Verrouiller</button>':'')
+  +'</td></tr>').join('')+'</table></div>';
+ box.querySelectorAll('[data-pub]').forEach(b=>b.onclick=async()=>{const{error}=await sb.rpc('set_quiz_status',{p_quiz_id:b.dataset.pub,p_new_status:'published'});error?toast(error.message,true):(toast('Quiz publié.'),refreshQuizList())});
+ box.querySelectorAll('[data-lock]').forEach(b=>b.onclick=async()=>{if(!confirm('Verrouiller ce quiz ? Il ne sera plus modifiable.'))return;const{error}=await sb.rpc('set_quiz_status',{p_quiz_id:b.dataset.lock,p_new_status:'locked'});error?toast(error.message,true):(toast('Quiz verrouillé.'),refreshQuizList())});
+ box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Supprimer ce quiz ?'))return;const{error}=await sb.rpc('delete_quiz',{p_quiz_id:b.dataset.del});error?toast(error.message,true):(toast('Quiz supprimé.'),refreshQuizList())});
+}
+function showQuizBuilder(){
+ const box=document.getElementById('qzBuilder');
+ box.innerHTML='<div class="card"><h3 style="margin-top:0">Nouveau quiz</h3><input id="qbTitle" placeholder="Titre du quiz" style="width:100%;margin-bottom:8px"><div id="qbQuestions"></div><div class="bar" style="margin-top:8px"><button id="qbAddQ">+ Ajouter une question</button><button id="qbSave" class="p">Enregistrer le quiz</button><button id="qbCancel">Annuler</button></div></div>';
+ const addQuestion=()=>{
+  const qid='qbq'+Math.random().toString(36).slice(2,8);
+  const div=document.createElement('div');div.className='card';div.style.marginTop='8px';div.dataset.qbox='1';
+  div.innerHTML='<input class="qtext" placeholder="Texte de la question" style="width:100%;margin-bottom:6px">'
+   +[0,1,2,3].map(i=>'<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><input type="radio" name="'+qid+'" value="'+i+'"'+(i===0?' checked':'')+'><input class="qchoice" placeholder="Réponse '+(i+1)+(i<2?' (obligatoire)':' (facultatif)')+'" style="flex:1"></div>').join('')
+   +'<button class="qbRemove">Retirer cette question</button>';
+  div.querySelector('.qbRemove').onclick=()=>div.remove();
+  document.getElementById('qbQuestions').appendChild(div);
+ };
+ addQuestion();
+ document.getElementById('qbAddQ').onclick=addQuestion;
+ document.getElementById('qbCancel').onclick=()=>box.innerHTML='';
+ document.getElementById('qbSave').onclick=async()=>{
+  const title=document.getElementById('qbTitle').value.trim();
+  if(!title)return toast('Le titre est obligatoire.',true);
+  const questions=[];
+  for(const qdiv of document.querySelectorAll('[data-qbox]')){
+   const qtext=qdiv.querySelector('.qtext').value.trim();
+   if(!qtext)continue;
+   const choiceInputs=[...qdiv.querySelectorAll('.qchoice')];
+   const correctIdx=qdiv.querySelector('input[type=radio]:checked')?.value;
+   const choices=choiceInputs.map((inp,i)=>({text:inp.value.trim(),is_correct:String(i)===correctIdx})).filter(c=>c.text);
+   if(choices.length<2||!choices.some(c=>c.is_correct)){toast('Chaque question doit avoir au moins 2 réponses et une bonne réponse cochée.',true);return}
+   questions.push({question_text:qtext,points:1,choices});
+  }
+  if(!questions.length)return toast('Ajoutez au moins une question complète.',true);
+  const{error}=await sb.rpc('create_quiz_with_questions',{p_class_id:M.cls,p_term_id:M.term,p_title:title,p_questions:questions,p_source:'native'});
+  if(error)return toast(error.message,true);
+  toast('Quiz créé en brouillon.');box.innerHTML='';refreshQuizList();
+ };
+}
+async function learnerQuizzes(){
+ V().innerHTML='<div id="qzList2"></div>';
+ const box=document.getElementById('qzList2');
+ if(!M.student){box.innerHTML='<div class="card empty">Le suivi des quiz par un compte parent arrive bientôt. Votre enfant peut passer ses quiz en se connectant avec son propre identifiant.</div>';return}
+ const enr=await sb.from('enrollments').select('class_id').eq('student_id',M.student.id).is('withdrawn_at',null).order('enrolled_at',{ascending:false}).limit(1).maybeSingle();
+ const classId=enr.data?.class_id;
+ if(!classId){box.innerHTML='<div class="card empty">Aucune classe active.</div>';return}
+ const{data,error}=await sb.from('quizzes').select('id,title,status').eq('class_id',classId).in('status',['published','locked']).order('created_at',{ascending:false});
+ if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
+ if(!data?.length){box.innerHTML='<div class="card empty">Aucun quiz disponible pour le moment.</div>';return}
+ const{data:mine}=await sb.from('quiz_attempts').select('quiz_id,status,score,max_score,id').eq('student_id',M.student.id);
+ const byQuiz={};(mine||[]).forEach(a=>byQuiz[a.quiz_id]=a);
+ box.innerHTML=data.map(q=>{
+  const a=byQuiz[q.id];const done=a&&a.status==='submitted';
+  return'<div class="card"><b>'+esc(q.title)+'</b> <span class="tag">'+esc(q.status)+'</span>'
+   +(done?'<p class="mu">Terminé — score : '+a.score+'/'+a.max_score+'</p><button data-review="'+a.id+'">Revoir la correction</button>'
+     :'<p class="mu">Pas encore passé</p><button data-take="'+q.id+'" class="p">Passer le quiz</button>')
+   +'</div>';
+ }).join('');
+ box.querySelectorAll('[data-take]').forEach(b=>b.onclick=()=>takeQuiz(b.dataset.take));
+ box.querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>reviewQuiz(b.dataset.review));
+}
+async function takeQuiz(quizId){
+ const{data,error}=await sb.rpc('get_quiz_for_taking',{p_quiz_id:quizId});
+ if(error)return toast(error.message,true);
+ const{data:attemptId,error:ae}=await sb.rpc('start_quiz_attempt',{p_quiz_id:quizId});
+ if(ae)return toast(ae.message,true);
+ const byQ={};data.forEach(r=>{(byQ[r.question_id]=byQ[r.question_id]||{text:r.question_text,pos:r.q_position,choices:[]}).choices.push({id:r.choice_id,text:r.choice_text,pos:r.c_position})});
+ const qs=Object.entries(byQ).sort((a,b)=>a[1].pos-b[1].pos);
+ V().innerHTML='<div class="card"><h3 style="margin-top:0">Quiz</h3>'+qs.map(([qid,q],i)=>'<div style="margin-bottom:14px"><p><b>'+(i+1)+'. '+esc(q.text)+'</b></p>'+q.choices.sort((a,b)=>a.pos-b.pos).map(c=>'<label style="display:block;margin:4px 0"><input type="radio" name="take_'+qid+'" value="'+c.id+'"> '+esc(c.text)+'</label>').join('')+'</div>').join('')+'<button id="qzSubmit" class="p">Envoyer mes réponses</button></div>';
+ document.getElementById('qzSubmit').onclick=async()=>{
+  const answers=qs.map(([qid])=>{const sel=document.querySelector('input[name="take_'+qid+'"]:checked');return{question_id:qid,choice_id:sel?sel.value:null}});
+  if(answers.some(a=>!a.choice_id)&&!confirm('Certaines questions sont sans réponse. Envoyer quand même ?'))return;
+  const{data:res,error:se}=await sb.rpc('submit_quiz_attempt',{p_attempt_id:attemptId,p_answers:answers});
+  if(se)return toast(se.message,true);
+  toast('Score : '+res.score+'/'+res.max_score);
+  learnerQuizzes();
+ };
+}
+async function reviewQuiz(attemptId){
+ const{data,error}=await sb.rpc('get_quiz_attempt_result',{p_attempt_id:attemptId});
+ if(error)return toast(error.message,true);
+ V().innerHTML='<div class="card"><h3 style="margin-top:0">Correction</h3>'+data.map((r,i)=>'<div style="margin-bottom:10px;padding:8px;border-left:3px solid '+(r.is_correct?'var(--ac)':'var(--er)')+'"><p><b>'+(i+1)+'. '+esc(r.question_text)+'</b></p><p>Votre réponse : '+esc(r.chosen_text||'—')+(r.is_correct?' ✓':' ✗ (bonne réponse : '+esc(r.correct_text)+')')+'</p></div>').join('')+'<button onclick="learnerQuizzes()">Retour</button></div>';
 }
 async function learnerNotes(){
  if(M.student){const {data}=await sb.from('assessment_results').select('score,status,assessments(title,assessment_date,max_score,coefficient,term_id,subjects!inner(name,is_enabled))').eq('student_id',M.student.id).eq('assessments.subject_id',M.english?.id).eq('assessments.status','published');renderLearnerNotes(data||[],M.student.first_name)}
