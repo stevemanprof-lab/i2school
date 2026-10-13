@@ -164,6 +164,20 @@ async function home(){
  }
 }
 
+async function editStudentName(studentId,currentFirst,currentLast,refresh){
+ const first=prompt('Corriger le prénom de l’élève :',currentFirst||'');
+ if(first===null)return;
+ const last=prompt('Corriger le nom de famille de l’élève :',currentLast||'');
+ if(last===null)return;
+ if(!first.trim()||!last.trim())return toast('Le prénom et le nom sont obligatoires.',true);
+ if(first.trim()===(currentFirst||'').trim()&&last.trim()===(currentLast||'').trim())return;
+ if(!confirm('Confirmer la correction du nom de cet élève ? Cette modification sera visible dans les espaces liés à son compte.'))return;
+ const{error}=await sb.rpc('admin_update_student_name',{p_student_id:studentId,p_first_name:first.trim(),p_last_name:last.trim()});
+ if(error)return toast(error.message||'Impossible de modifier le nom.',true);
+ toast('Nom de l’élève mis à jour.');
+ await refresh();
+}
+
 async function access(){
  if(!M.staff){V().innerHTML='<div class="card">Accès réservé à l’administration.</div>';return}
  const [st,pa]=await Promise.all([
@@ -175,27 +189,14 @@ async function access(){
  V().innerHTML='<div class="card hero"><h2 style="margin:0 0 6px">Accès utilisateurs</h2><div class="mu">Créez un accès sécurisé pour un élève ou un parent. I2School envoie directement l’invitation par e-mail.</div></div>'+
  '<div class="card sc"><div class="bar"><b>Élèves</b><span class="tag">'+students.length+' élèves</span></div>'+
  '<table><tr><th>Élève</th><th>Matricule</th><th>E-mail</th><th>Accès</th><th></th></tr>'+
- students.map(x=>'<tr><td><b>'+esc(x.last_name)+' '+esc(x.first_name)+'</b></td><td>'+esc(x.student_number||'—')+'</td><td>'+esc(x.email||'—')+'</td><td><span class="tag">'+(x.profile_id?'Accès créé':'Pas encore d’accès')+'</span></td><td><button data-edit-student="'+x.id+'" data-first="'+esc(x.first_name||'')+'" data-last="'+esc(x.last_name||'')+'">Modifier le nom</button> '+(x.profile_id?'<span class="mu">Déjà activé</span>':'<button data-grant="student" data-id="'+x.id+'">Donner un accès</button>')+'</td></tr>').join('')+
+ students.map(x=>'<tr><td><b>'+esc(x.last_name)+' '+esc(x.first_name)+'</b></td><td>'+esc(x.student_number||'—')+'</td><td>'+esc(x.email||'—')+'</td><td><span class="tag">'+(x.profile_id?'Accès créé':'Pas encore d’accès')+'</span></td><td><button data-edit-student="'+x.id+'" data-first="'+esc(x.first_name||'')+'" data-last="'+esc(x.last_name||'')+'">✎ Modifier le nom</button> '+(x.profile_id?'<span class="mu">Déjà activé</span>':'<button data-grant="student" data-id="'+x.id+'">Donner un accès</button>')+'</td></tr>').join('')+
  '</table></div>'+
  '<div class="card sc"><div class="bar"><b>Parents</b><span class="tag">'+parents.length+' parents</span></div>'+
  '<table><tr><th>Parent</th><th>Téléphone</th><th>E-mail</th><th>Accès</th><th></th></tr>'+
  parents.map(x=>'<tr><td><b>'+esc(x.last_name)+' '+esc(x.first_name)+'</b></td><td>'+esc(x.phone||'—')+'</td><td>'+esc(x.email||'—')+'</td><td><span class="tag">'+(x.profile_id?'Accès créé':'Pas encore d’accès')+'</span></td><td>'+(x.profile_id?'<span class="mu">Déjà activé</span>':'<button data-grant="parent" data-id="'+x.id+'">Donner un accès</button>')+'</td></tr>').join('')+
  '</table></div>';
  V().querySelectorAll('[data-grant]').forEach(b=>b.onclick=()=>grantAccess(b.dataset.grant,b.dataset.id));
- V().querySelectorAll('[data-edit-student]').forEach(b=>b.onclick=async()=>{
-  const first=prompt('Corriger le prénom de l’élève :',b.dataset.first||'');
-  if(first===null)return;
-  const last=prompt('Corriger le nom de famille de l’élève :',b.dataset.last||'');
-  if(last===null)return;
-  if(!first.trim()||!last.trim())return toast('Le prénom et le nom sont obligatoires.',true);
-  if(first.trim()===(b.dataset.first||'').trim()&&last.trim()===(b.dataset.last||'').trim())return;
-  if(!confirm('Confirmer la correction du nom de cet élève ? Cette modification sera visible dans les espaces liés à son compte.'))return;
-  b.disabled=true;
-  const{error}=await sb.rpc('admin_update_student_name',{p_student_id:b.dataset.editStudent,p_first_name:first.trim(),p_last_name:last.trim()});
-  if(error){b.disabled=false;return toast(error.message||'Impossible de modifier le nom.',true)}
-  toast('Nom de l’élève mis à jour.');
-  await access();
- });
+ V().querySelectorAll('[data-edit-student]').forEach(b=>b.onclick=()=>editStudentName(b.dataset.editStudent,b.dataset.first,b.dataset.last,()=>access()));
 }
 async function grantAccess(kind,id){
  const label=kind==='student'?'élève':'parent';
@@ -240,7 +241,8 @@ async function renderRoster(){
  box.innerHTML='<div class="card empty">Chargement des élèves…</div>';
  const {data,error}=await sb.rpc('get_managed_class_roster',{p_class_id:M.cls});
  if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
- box.innerHTML='<div class="card sc"><div class="bar"><b>'+esc(M.eclasses.find(x=>x.id===M.cls)?.name||'Classe')+'</b><span class="tag">'+(data?.length||0)+' élèves</span></div><table><tr><th>#</th><th>Élève</th><th>Matricule</th><th>Accès</th><th></th></tr>'+(data||[]).map((x,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+esc(x.last_name)+' '+esc(x.first_name)+'</b><div class="mu">'+esc(x.email||'')+'</div></td><td>'+esc(x.student_number||'—')+'</td><td><span class="tag">'+(x.has_login?'Accès créé':'Pas encore d’accès')+'</span></td><td><button class="d" data-remove-student="'+x.student_id+'">Retirer</button></td></tr>').join('')+'</table></div>';
+ box.innerHTML='<div class="card sc"><div class="bar"><b>'+esc(M.eclasses.find(x=>x.id===M.cls)?.name||'Classe')+'</b><span class="tag">'+(data?.length||0)+' élèves</span></div><table><tr><th>#</th><th>Élève</th><th>Matricule</th><th>Accès</th><th></th></tr>'+(data||[]).map((x,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+esc(x.last_name)+' '+esc(x.first_name)+'</b><div class="mu">'+esc(x.email||'')+'</div></td><td>'+esc(x.student_number||'—')+'</td><td><span class="tag">'+(x.has_login?'Accès créé':'Pas encore d’accès')+'</span></td><td><button data-roster-edit-student="'+x.student_id+'" data-first="'+esc(x.first_name||'')+'" data-last="'+esc(x.last_name||'')+'">✎ Modifier le nom</button> <button class="d" data-remove-student="'+x.student_id+'">Retirer</button></td></tr>').join('')+'</table></div>';
+ box.querySelectorAll('[data-roster-edit-student]').forEach(b=>b.addEventListener('click',()=>editStudentName(b.dataset.rosterEditStudent,b.dataset.first,b.dataset.last,()=>renderRoster())));
  box.querySelectorAll('[data-remove-student]').forEach(b=>b.addEventListener('click',async()=>{
    if(!confirm('Retirer cet élève de la classe ? Son historique sera conservé.'))return;
    const {error}=await sb.rpc('remove_student_from_managed_class',{p_student_id:b.dataset.removeStudent,p_class_id:M.cls,p_withdrawn_at:new Date().toISOString().slice(0,10)});
