@@ -332,9 +332,16 @@ async function gradeGrid(id){
  box.innerHTML='<div class="card sc"><div class="bar"><div style="margin-right:auto"><b>'+esc(ass.title)+'</b><div class="mu">'+esc(ass.assessment_date||'')+' · '+esc(ass.assessment_type||'')+' · /'+ass.max_score+'</div></div><span class="tag">'+ST[ass.status]+'</span></div><table><tr><th>Élève</th><th>Note /'+ass.max_score+'</th><th>Statut</th></tr>'+rows.map(x=>'<tr data-result-id="'+x.id+'"><td>'+esc(x.students?.last_name||'')+' '+esc(x.students?.first_name||'')+' <span class="mu">'+esc(x.students?.student_number||'')+'</span></td><td><input class="gradeValue" type="number" min="0" max="'+ass.max_score+'" step=".25" value="'+(x.score??'')+'" '+(locked?'disabled':'')+'></td><td><select class="gradeStatus" '+(locked?'disabled':'')+'>'+['present','absent','excused','missing'].map(s=>'<option value="'+s+'" '+(s===x.status?'selected':'')+'>'+s+'</option>').join('')+'</select></td></tr>').join('')+'</table><div class="bar"><button class="p" id="saveGradesBtn" '+(locked?'disabled':'')+'>Enregistrer les notes</button><button id="publishEvalBtn" '+(locked?'disabled':'')+'>Publier l’évaluation</button></div></div>';
  document.getElementById('saveGradesBtn')?.addEventListener('click',async()=>{
    const results=[...box.querySelectorAll('tr[data-result-id]')].map(tr=>{const status=tr.querySelector('.gradeStatus').value;const raw=tr.querySelector('.gradeValue').value;return{result_id:tr.dataset.resultId,score:status==='present'&&raw!==''?Number(raw):null,status}});
+   const existingById=new Map((data||[]).map(x=>[x.id,x]));
+   const removals=results.filter(x=>existingById.get(x.result_id)?.score!=null&&x.score===null);
+   let adminCode=null;
+   if(removals.length){
+    if(!confirm('Vous allez retirer '+removals.length+' note(s) déjà enregistrée(s). Cette action affectera les moyennes et les résultats visibles. Un code d’accès administrateur sera exigé. Continuer ?'))return;
+    adminCode=await requestAdminDeleteCode();if(!adminCode)return toast('Modification annulée : code non saisi.',true);
+   }
    const btn=document.getElementById('saveGradesBtn');btn.disabled=true;
-   const {error}=await sb.rpc('save_english_assessment_results',{p_assessment_id:id,p_results:results});
-   btn.disabled=false;if(error)toast(error.message,true);else toast('Notes enregistrées.');
+   const {error}=await sb.rpc('save_english_assessment_results_secure',{p_assessment_id:id,p_results:results,p_admin_code:adminCode});
+   btn.disabled=false;if(error)toast(error.message,true);else{toast(removals.length?'Notes retirées après confirmation administrateur.':'Notes enregistrées.');await gradeGrid(id)}
  });
  document.getElementById('publishEvalBtn')?.addEventListener('click',async()=>{
    if(!confirm('Publier cette évaluation ? Les élèves pourront alors voir les résultats.'))return;
