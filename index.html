@@ -175,13 +175,27 @@ async function access(){
  V().innerHTML='<div class="card hero"><h2 style="margin:0 0 6px">Accès utilisateurs</h2><div class="mu">Créez un accès sécurisé pour un élève ou un parent. I2School envoie directement l’invitation par e-mail.</div></div>'+
  '<div class="card sc"><div class="bar"><b>Élèves</b><span class="tag">'+students.length+' élèves</span></div>'+
  '<table><tr><th>Élève</th><th>Matricule</th><th>E-mail</th><th>Accès</th><th></th></tr>'+
- students.map(x=>'<tr><td><b>'+esc(x.last_name)+' '+esc(x.first_name)+'</b></td><td>'+esc(x.student_number||'—')+'</td><td>'+esc(x.email||'—')+'</td><td><span class="tag">'+(x.profile_id?'Accès créé':'Pas encore d’accès')+'</span></td><td>'+(x.profile_id?'<span class="mu">Déjà activé</span>':'<button data-grant="student" data-id="'+x.id+'">Donner un accès</button>')+'</td></tr>').join('')+
+ students.map(x=>'<tr><td><b>'+esc(x.last_name)+' '+esc(x.first_name)+'</b></td><td>'+esc(x.student_number||'—')+'</td><td>'+esc(x.email||'—')+'</td><td><span class="tag">'+(x.profile_id?'Accès créé':'Pas encore d’accès')+'</span></td><td><button data-edit-student="'+x.id+'" data-first="'+esc(x.first_name||'')+'" data-last="'+esc(x.last_name||'')+'">Modifier le nom</button> '+(x.profile_id?'<span class="mu">Déjà activé</span>':'<button data-grant="student" data-id="'+x.id+'">Donner un accès</button>')+'</td></tr>').join('')+
  '</table></div>'+
  '<div class="card sc"><div class="bar"><b>Parents</b><span class="tag">'+parents.length+' parents</span></div>'+
  '<table><tr><th>Parent</th><th>Téléphone</th><th>E-mail</th><th>Accès</th><th></th></tr>'+
  parents.map(x=>'<tr><td><b>'+esc(x.last_name)+' '+esc(x.first_name)+'</b></td><td>'+esc(x.phone||'—')+'</td><td>'+esc(x.email||'—')+'</td><td><span class="tag">'+(x.profile_id?'Accès créé':'Pas encore d’accès')+'</span></td><td>'+(x.profile_id?'<span class="mu">Déjà activé</span>':'<button data-grant="parent" data-id="'+x.id+'">Donner un accès</button>')+'</td></tr>').join('')+
  '</table></div>';
  V().querySelectorAll('[data-grant]').forEach(b=>b.onclick=()=>grantAccess(b.dataset.grant,b.dataset.id));
+ V().querySelectorAll('[data-edit-student]').forEach(b=>b.onclick=async()=>{
+  const first=prompt('Corriger le prénom de l’élève :',b.dataset.first||'');
+  if(first===null)return;
+  const last=prompt('Corriger le nom de famille de l’élève :',b.dataset.last||'');
+  if(last===null)return;
+  if(!first.trim()||!last.trim())return toast('Le prénom et le nom sont obligatoires.',true);
+  if(first.trim()===(b.dataset.first||'').trim()&&last.trim()===(b.dataset.last||'').trim())return;
+  if(!confirm('Confirmer la correction du nom de cet élève ? Cette modification sera visible dans les espaces liés à son compte.'))return;
+  b.disabled=true;
+  const{error}=await sb.rpc('admin_update_student_name',{p_student_id:b.dataset.editStudent,p_first_name:first.trim(),p_last_name:last.trim()});
+  if(error){b.disabled=false;return toast(error.message||'Impossible de modifier le nom.',true)}
+  toast('Nom de l’élève mis à jour.');
+  await access();
+ });
 }
 async function grantAccess(kind,id){
  const label=kind==='student'?'élève':'parent';
