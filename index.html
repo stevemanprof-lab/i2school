@@ -453,17 +453,21 @@ async function staffQuizzes(){
 async function refreshQuizList(){
   const box=document.getElementById('qzList');if(!box)return;
   box.innerHTML='<div class="card empty">Chargement des quiz et des résultats…</div>';
-  const{data,error}=await sb.from('quizzes').select('id,title,status,coefficient,linked_assessment_id,created_at,class_id').eq('class_id',M.cls).order('created_at',{ascending:false});
+  const{data,error}=await sb.from('quizzes').select('id,title,status,coefficient,linked_assessment_id,created_at,class_id,source,scheduled_at,due_at').eq('class_id',M.cls).order('created_at',{ascending:false});
   if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
   if(!data?.length){box.innerHTML='<div class="card empty">Aucun quiz pour cette classe.</div>';return}
   const details=await Promise.all(data.map(async q=>{const r=await sb.rpc('get_quiz_roster',{p_quiz_id:q.id});return {q,roster:r.data||[],error:r.error?.message}}));
-  box.innerHTML=details.map(({q,roster,error:err})=>{
+  const dateLabel=v=>v?new Date(v).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}):'Non définie';
+  const calendar=details.filter(x=>x.q.scheduled_at||x.q.due_at).sort((a,b)=>new Date(a.q.scheduled_at||a.q.due_at)-new Date(b.q.scheduled_at||b.q.due_at));
+  box.innerHTML=(calendar.length?'<div class="card"><h3 style="margin-top:0">Calendrier des quiz</h3>'+calendar.map(({q})=>'<div style="padding:8px 0;border-bottom:1px solid var(--bd)"><b>'+esc(q.title)+'</b><div class="meta">Programmation : '+esc(dateLabel(q.scheduled_at))+' · Date butoir : '+esc(dateLabel(q.due_at))+'</div></div>').join('')+'</div>':'<div class="card empty">Les dates de programmation et les dates butoirs apparaîtront ici.</div>')+details.map(({q,roster,error:err})=>{
    const submitted=roster.filter(s=>s.submitted);
    const average20=submitted.length?submitted.reduce((sum,s)=>sum+(Number(s.score||0)/Math.max(1,Number(s.max_score||1))*20),0)/submitted.length:null;
    return '<div class="card"><div class="bar"><div style="flex:1"><h3 style="margin:0 0 4px">'+esc(q.title)+'</h3><span class="tag">'+esc(q.status)+'</span> <span class="mu">Coefficient '+esc(String(q.coefficient||1))+'</span></div><div class="grid"><div><div class="k">Copies rendues</div><b>'+submitted.length+' / '+roster.length+'</b></div><div><div class="k">Moyenne du quiz</div><b>'+(average20===null?'—':average20.toFixed(2)+'/20')+'</b></div></div></div>'
+   +'<p class="meta">Programmation : '+esc(dateLabel(q.scheduled_at))+' · Date butoir : '+esc(dateLabel(q.due_at))+'</p>'
    +(err?'<p class="mu">Détail indisponible : '+esc(err)+'</p>':'<details style="margin-top:10px"><summary>Voir le suivi individuel ('+roster.length+' élèves)</summary><div class="sc"><table><tr><th>Élève</th><th>Statut</th><th>Score quiz</th><th>Note /20</th><th>Date</th></tr>'+roster.map(s=>'<tr><td>'+esc((s.last_name||'')+' '+(s.first_name||''))+'<div class="meta">'+esc(s.student_number||'')+'</div></td><td>'+(s.submitted?'<span class="tag">Rendu</span>':'<span class="tag">En attente</span>')+'</td><td>'+(s.submitted?esc(String(s.score))+'/'+esc(String(s.max_score)):'—')+'</td><td>'+(s.submitted?(Number(s.score||0)/Math.max(1,Number(s.max_score||1))*20).toFixed(2):'—')+'</td><td>'+esc(s.submitted_at?new Date(s.submitted_at).toLocaleString('fr-FR'):'—')+'</td></tr>').join('')+'</table></div></details>')
-   +'<div class="bar" style="margin-top:10px">'+(q.status==='draft'?'<button data-pub="'+q.id+'" class="p">Publier</button>':'')+(q.status==='published'?'<button data-lock="'+q.id+'">Verrouiller</button>':'')+' <button data-del="'+q.id+'" class="d">Supprimer</button>'+'</div></div>';
+   +'<div class="bar" style="margin-top:10px">'+'<button data-edit="'+q.id+'">Modifier</button>'+(q.status==='draft'?'<button data-pub="'+q.id+'" class="p">Publier</button>':'')+(q.status==='published'?'<button data-lock="'+q.id+'">Verrouiller</button>':'')+' <button data-del="'+q.id+'" class="d">Supprimer</button>'+'</div></div>';
   }).join('');
+  box.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>showQuizBuilder(b.dataset.edit));
   box.querySelectorAll('[data-pub]').forEach(b=>b.onclick=async()=>{const{error}=await sb.rpc('set_quiz_status',{p_quiz_id:b.dataset.pub,p_new_status:'published'});error?toast(error.message,true):(toast('Quiz publié.'),refreshQuizList())});
   box.querySelectorAll('[data-lock]').forEach(b=>b.onclick=async()=>{if(!confirm('Verrouiller ce quiz ? Il ne sera plus modifiable.'))return;const{error}=await sb.rpc('set_quiz_status',{p_quiz_id:b.dataset.lock,p_new_status:'locked'});error?toast(error.message,true):(toast('Quiz verrouillé.'),refreshQuizList())});
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{const card=b.closest('.card');const title=card?.querySelector('h3')?.textContent?.trim()||'ce quiz';if(!confirm('Confirmer la suppression du quiz « '+title+' » ?\n\nCette action définitive supprimera le quiz, ses questions, choix, tentatives et les notes de son évaluation liée. Un code d’accès administrateur sera ensuite exigé.'))return;const adminCode=await requestAdminDeleteCode();if(!adminCode)return toast('Suppression annulée : code non saisi.',true);b.disabled=true;const{error}=await sb.rpc('delete_quiz',{p_quiz_id:b.dataset.del,p_admin_code:adminCode});if(error){b.disabled=false;toast(error.message,true)}else{toast('Quiz et notes associées supprimés.');refreshQuizList()}});
@@ -530,7 +534,8 @@ async function showQuizBuilder(quizId=null){
   if(!title)return toast('Le titre est obligatoire.',true);
   if(!Number.isFinite(coefficient)||coefficient<=0)return toast('Le coefficient doit être supérieur à zéro.',true);
   const scheduled=document.getElementById('qbScheduled').value,due=document.getElementById('qbDue').value;
-  if(scheduled&&due&&new Date(due)<new Date(scheduled))return toast('La date butoir doit être postérieure à la programmation.',true);
+  if(!scheduled||!due)return toast('La date de programmation et la date butoir sont obligatoires.',true);
+  if(new Date(due)<new Date(scheduled))return toast('La date butoir doit être postérieure à la programmation.',true);
   const questions=[];
   for(const qdiv of qcontainer.querySelectorAll('[data-qbox]')){
    const qtext=qdiv.querySelector('.qtext').value.trim();if(!qtext)continue;
@@ -557,16 +562,18 @@ async function learnerQuizzes(){
  const enr=await sb.from('enrollments').select('class_id').eq('student_id',M.student.id).is('withdrawn_at',null).order('enrolled_at',{ascending:false}).limit(1).maybeSingle();
  const classId=enr.data?.class_id;
  if(!classId){box.innerHTML='<div class="card empty">Aucune classe active.</div>';return}
- const{data,error}=await sb.from('quizzes').select('id,title,status').eq('class_id',classId).in('status',['published','locked']).order('created_at',{ascending:false});
+ const{data,error}=await sb.from('quizzes').select('id,title,status,scheduled_at,due_at').eq('class_id',classId).in('status',['published','locked']).order('scheduled_at',{ascending:true,nullsFirst:false});
  if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
  if(!data?.length){box.innerHTML='<div class="card empty">Aucun quiz disponible pour le moment.</div>';return}
  const{data:mine}=await sb.from('quiz_attempts').select('quiz_id,status,score,max_score,id').eq('student_id',M.student.id);
  const byQuiz={};(mine||[]).forEach(a=>byQuiz[a.quiz_id]=a);
  box.innerHTML=data.map(q=>{
   const a=byQuiz[q.id];const done=a&&a.status==='submitted';
-  return'<div class="card"><b>'+esc(q.title)+'</b> <span class="tag">'+esc(q.status)+'</span>'
+  const now=Date.now(),future=q.scheduled_at&&now<new Date(q.scheduled_at).getTime(),expired=q.due_at&&now>new Date(q.due_at).getTime();
+  const dates='<p class="meta">Programmation : '+esc(q.scheduled_at?new Date(q.scheduled_at).toLocaleString('fr-FR'):'—')+' · Date butoir : '+esc(q.due_at?new Date(q.due_at).toLocaleString('fr-FR'):'—')+'</p>';
+  return'<div class="card"><b>'+esc(q.title)+'</b> <span class="tag">'+esc(q.status)+'</span>'+dates
    +(done?'<p class="mu">Terminé — score : '+a.score+'/'+a.max_score+'</p><button data-review="'+a.id+'">Revoir la correction</button>'
-     :'<p class="mu">Pas encore passé</p><button data-take="'+q.id+'" class="p">Passer le quiz</button>')
+     :'<p class="mu">'+(future?'Disponible à partir de la date programmée.':expired?'Date butoir dépassée.':'Pas encore passé')+'</p><button data-take="'+q.id+'" class="p" '+((future||expired||q.status!=='published')?'disabled':'')+'>Passer le quiz</button>')
    +'</div>';
  }).join('');
  box.querySelectorAll('[data-take]').forEach(b=>b.onclick=()=>takeQuiz(b.dataset.take));
@@ -577,9 +584,9 @@ async function takeQuiz(quizId){
  if(error)return toast(error.message,true);
  const{data:attemptId,error:ae}=await sb.rpc('start_quiz_attempt',{p_quiz_id:quizId});
  if(ae)return toast(ae.message,true);
- const byQ={};data.forEach(r=>{(byQ[r.question_id]=byQ[r.question_id]||{text:r.question_text,pos:r.q_position,choices:[]}).choices.push({id:r.choice_id,text:r.choice_text,pos:r.c_position})});
+ const byQ={};data.forEach(r=>{(byQ[r.question_id]=byQ[r.question_id]||{text:r.question_text,pos:r.q_position,image_path:r.image_path,choices:[]}).choices.push({id:r.choice_id,text:r.choice_text,pos:r.c_position})});
  const qs=Object.entries(byQ).sort((a,b)=>a[1].pos-b[1].pos);
- V().innerHTML='<div class="card"><h3 style="margin-top:0">Quiz</h3>'+qs.map(([qid,q],i)=>'<div style="margin-bottom:14px"><p><b>'+(i+1)+'. '+esc(q.text)+'</b></p>'+q.choices.sort((a,b)=>a.pos-b.pos).map(c=>'<label style="display:block;margin:4px 0"><input type="radio" name="take_'+qid+'" value="'+c.id+'"> '+esc(c.text)+'</label>').join('')+'</div>').join('')+'<button id="qzSubmit" class="p">Envoyer mes réponses</button></div>';
+ V().innerHTML='<div class="card"><h3 style="margin-top:0">Quiz</h3>'+qs.map(([qid,q],i)=>'<div style="margin-bottom:14px"><p><b>'+(i+1)+'. '+esc(q.text)+'</b></p>'+(q.image_path?'<img src="'+esc(quizImageUrl(q.image_path))+'" alt="Illustration de la question" style="display:block;max-width:100%;max-height:320px;object-fit:contain;margin:8px 0;border-radius:6px">':'')+q.choices.sort((a,b)=>a.pos-b.pos).map(c=>'<label style="display:block;margin:4px 0"><input type="radio" name="take_'+qid+'" value="'+c.id+'"> '+esc(c.text)+'</label>').join('')+'</div>').join('')+'<button id="qzSubmit" class="p">Envoyer mes réponses</button></div>';
  document.getElementById('qzSubmit').onclick=async()=>{
   const answers=qs.map(([qid])=>{const sel=document.querySelector('input[name="take_'+qid+'"]:checked');return{question_id:qid,choice_id:sel?sel.value:null}});
   if(answers.some(a=>!a.choice_id)&&!confirm('Certaines questions sont sans réponse. Envoyer quand même ?'))return;
