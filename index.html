@@ -513,7 +513,7 @@ async function showQuizBuilder(quizId=null){
    initialQuestions.push({question_text:q.question_text,points:q.points,image_path:q.image_path,choices:(cs||[]).map(c=>({text:c.choice_text,is_correct:c.is_correct}))});
   }
  }
- const localDate=v=>v?new Date(v).toISOString().slice(0,16):'';
+ const localDate=v=>{if(!v)return '';const d=new Date(new Date(v).getTime()-new Date(v).getTimezoneOffset()*60000);return d.toISOString().slice(0,16)};
  box.innerHTML='<div class="card"><h3 style="margin-top:0">'+(existing?'Modifier le quiz':'Nouveau quiz')+'</h3>'
   +'<label>Titre du quiz</label><input id="qbTitle" value="'+esc(existing?.title||'')+'" placeholder="Titre du quiz" style="width:100%;margin:5px 0 10px">'
   +'<div class="grid"><div class="field"><label>Coefficient pour la moyenne générale</label><input id="qbCoef" type="number" min="0.1" step="0.1" value="'+esc(String(existing?.coefficient||1))+'"></div>'
