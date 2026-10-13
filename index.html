@@ -514,11 +514,49 @@ async function reviewQuiz(attemptId){
  V().innerHTML='<div class="card"><h3 style="margin-top:0">Correction</h3>'+data.map((r,i)=>'<div style="margin-bottom:10px;padding:8px;border-left:3px solid '+(r.is_correct?'var(--ac)':'var(--er)')+'"><p><b>'+(i+1)+'. '+esc(r.question_text)+'</b></p><p>Votre réponse : '+esc(r.chosen_text||'—')+(r.is_correct?' ✓':' ✗ (bonne réponse : '+esc(r.correct_text)+')')+'</p></div>').join('')+'<button onclick="learnerQuizzes()">Retour</button></div>';
 }
 async function learnerNotes(){
- if(M.student){const {data}=await sb.from('assessment_results').select('score,status,assessments(title,assessment_date,max_score,coefficient,term_id,subjects!inner(name,is_enabled))').eq('student_id',M.student.id).eq('assessments.subject_id',M.english?.id).eq('assessments.status','published');renderLearnerNotes(data||[],M.student.first_name)}
- else{const kids=M.children||[];V().innerHTML='<div class="bar"><select id="kid">'+opts(kids,'id',x=>x.last_name+' '+x.first_name)+'</select></div><div id="kidNotes"></div>';kid.onchange=()=>parentNotes(kid.value);if(kids[0])parentNotes(kids[0].id)}
+ if(M.student){
+  const {data,error}=await sb.from('assessment_results')
+   .select('score,status,assessments(title,assessment_date,max_score,coefficient,term_id,subjects!inner(name,is_enabled))')
+   .eq('student_id',M.student.id)
+   .eq('assessments.subject_id',M.english?.id)
+   .eq('assessments.status','published')
+   .order('created_at',{ascending:false});
+  if(error){V().innerHTML='<div class="card">Impossible de charger vos notes : '+esc(error.message)+'</div>';return}
+  renderLearnerNotes(data||[],M.student.first_name);
+ }else{
+  const kids=M.children||[];
+  if(!kids.length){V().innerHTML='<div class="card empty">Aucun élève rattaché à ce compte parent.</div>';return}
+  V().innerHTML='<div class="bar"><label class="mu">Élève</label><select id="kid">'+opts(kids,'id',x=>x.last_name+' '+x.first_name)+'</select></div><div id="kidNotes"></div>';
+  document.getElementById('kid').onchange=()=>parentNotes(document.getElementById('kid').value);
+  await parentNotes(kids[0].id);
+ }
 }
-async function parentNotes(id){const {data}=await sb.from('assessment_results').select('score,status,assessments(title,assessment_date,max_score,coefficient,subjects!inner(name,is_enabled))').eq('student_id',id).eq('assessments.subject_id',M.english?.id).eq('assessments.status','published');kidNotes.innerHTML='<div class="card">'+(data||[]).map(x=>'<div class="msg"><b>'+esc(x.assessments.title)+'</b><div class="meta">'+esc(x.assessments.assessment_date||'')+' · coef. '+x.assessments.coefficient+'</div><strong>'+(x.status==='present'?money(x.score)+' / '+x.assessments.max_score:x.status)+'</strong></div>').join('')||'<div class="empty">Aucune note publiée.</div>'+'</div>'}
-function renderLearnerNotes(data,name){V().innerHTML='<div class="card"><h2>Mes notes d’anglais</h2><p class="mu">Bonjour '+esc(name)+'. Seules les évaluations publiées sont visibles.</p>'+(data||[]).map(x=>'<div class="msg"><b>'+esc(x.assessments.title)+'</b><div class="meta">'+esc(x.assessments.assessment_date||'')+' · coef. '+x.assessments.coefficient+'</div><strong>'+(x.status==='present'?money(x.score)+' / '+x.assessments.max_score:x.status)+'</strong></div>').join('')||'<div class="empty">Aucune note publiée.</div>'+'</div>'}
+async function parentNotes(id){
+ const box=document.getElementById('kidNotes');
+ if(!box)return;
+ box.innerHTML='<div class="card empty">Chargement des notes…</div>';
+ const {data,error}=await sb.from('assessment_results')
+  .select('score,status,assessments(title,assessment_date,max_score,coefficient,subjects!inner(name,is_enabled))')
+  .eq('student_id',id)
+  .eq('assessments.subject_id',M.english?.id)
+  .eq('assessments.status','published')
+  .order('created_at',{ascending:false});
+ if(error){box.innerHTML='<div class="card">Impossible de charger les notes : '+esc(error.message)+'</div>';return}
+ const rows=(data||[]).map(x=>{
+  const a=x.assessments||{};
+  const grade=x.status==='present'&&x.score!==null?money(x.score)+' / '+a.max_score+(Number(a.max_score)>0?' · '+money(Number(x.score)/Number(a.max_score)*20)+' /20':''):esc(x.status);
+  return '<div class="msg"><b>'+esc(a.title||'Évaluation')+'</b><div class="meta">'+esc(a.assessment_date||'')+' · coef. '+esc(String(a.coefficient??'—'))+'</div><strong>'+grade+'</strong></div>';
+ }).join('');
+ box.innerHTML=rows?'<div class="card"><h3>Notes d’anglais</h3>'+rows+'</div>':'<div class="card empty">Aucune note publiée pour le moment.</div>';
+}
+function renderLearnerNotes(data,name){
+ const rows=(data||[]).map(x=>{
+  const a=x.assessments||{};
+  const grade=x.status==='present'&&x.score!==null?money(x.score)+' / '+a.max_score+(Number(a.max_score)>0?' · '+money(Number(x.score)/Number(a.max_score)*20)+' /20':''):esc(x.status);
+  return '<div class="msg"><b>'+esc(a.title||'Évaluation')+'</b><div class="meta">'+esc(a.assessment_date||'')+' · coef. '+esc(String(a.coefficient??'—'))+'</div><strong>'+grade+'</strong></div>';
+ }).join('');
+ V().innerHTML='<div class="card"><h2>Mes notes d’anglais</h2><p class="mu">Bonjour '+esc(name)+'. Seules les évaluations publiées sont visibles.</p>'+(rows||'<div class="empty">Aucune note publiée pour le moment.</div>')+'</div>';
+}
 
 async function learnerBulletins(){
  if(M.student){
