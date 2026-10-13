@@ -438,10 +438,17 @@ async function staffQuizzes(){
    const text=await file.text();
    const questions=parseMoodleXml(text);
    const title=prompt('Titre du quiz ?',file.name.replace(/\.xml$/i,''));
-    const coefficient=Number(prompt('Coefficient pour la moyenne générale ?', '1')||1);
-    if(!Number.isFinite(coefficient)||coefficient<=0)throw new Error('Le coefficient doit être supérieur à zéro.');
    if(!title){e.target.value='';return}
-   const{error}=await sb.rpc('create_quiz_with_questions',{p_class_id:M.cls,p_term_id:M.term,p_title:title,p_questions:questions,p_source:'import_moodle_xml',p_coefficient:coefficient});
+   const coefficient=Number(prompt('Coefficient pour la moyenne générale ?', '1')||1);
+   if(!Number.isFinite(coefficient)||coefficient<=0)throw new Error('Le coefficient doit être supérieur à zéro.');
+   const scheduled=prompt('Date de programmation (format AAAA-MM-JJTHH:MM, par ex. 2026-10-20T08:00) :');
+   if(!scheduled){e.target.value='';return}
+   const due=prompt('Date butoir (format AAAA-MM-JJTHH:MM, par ex. 2026-10-25T23:59) :');
+   if(!due){e.target.value='';return}
+   const scheduledAt=new Date(scheduled),dueAt=new Date(due);
+   if(!Number.isFinite(scheduledAt.getTime())||!Number.isFinite(dueAt.getTime()))throw new Error('Date invalide. Utilisez AAAA-MM-JJTHH:MM.');
+   if(dueAt<scheduledAt)throw new Error('La date butoir doit être postérieure à la programmation.');
+   const{error}=await sb.rpc('create_quiz_with_questions_v2',{p_class_id:M.cls,p_term_id:M.term,p_title:title,p_questions:questions,p_source:'import_moodle_xml',p_coefficient:coefficient,p_scheduled_at:scheduledAt.toISOString(),p_due_at:dueAt.toISOString()});
    if(error)return toast(error.message,true);
    toast(questions.length+' question(s) importée(s) en brouillon.');
    refreshQuizList();
