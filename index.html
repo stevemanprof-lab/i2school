@@ -405,8 +405,10 @@ async function staffQuizzes(){
    const text=await file.text();
    const questions=parseMoodleXml(text);
    const title=prompt('Titre du quiz ?',file.name.replace(/\.xml$/i,''));
+    const coefficient=Number(prompt('Coefficient pour la moyenne générale ?', '1')||1);
+    if(!Number.isFinite(coefficient)||coefficient<=0)throw new Error('Le coefficient doit être supérieur à zéro.');
    if(!title){e.target.value='';return}
-   const{error}=await sb.rpc('create_quiz_with_questions',{p_class_id:M.cls,p_term_id:M.term,p_title:title,p_questions:questions,p_source:'import_moodle_xml'});
+   const{error}=await sb.rpc('create_quiz_with_questions',{p_class_id:M.cls,p_term_id:M.term,p_title:title,p_questions:questions,p_source:'import_moodle_xml',p_coefficient:coefficient});
    if(error)return toast(error.message,true);
    toast(questions.length+' question(s) importée(s) en brouillon.');
    refreshQuizList();
@@ -416,22 +418,26 @@ async function staffQuizzes(){
  await refreshQuizList();
 }
 async function refreshQuizList(){
- const box=document.getElementById('qzList');if(!box)return;
- box.innerHTML='<div class="card empty">Chargement…</div>';
- const{data,error}=await sb.from('v_quiz_overview').select('*').eq('class_id',M.cls).order('title');
- if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
- if(!data?.length){box.innerHTML='<div class="card empty">Aucun quiz pour cette classe.</div>';return}
- box.innerHTML='<div class="card sc"><table><tr><th>Titre</th><th>Statut</th><th>Soumis</th><th>Score moyen</th><th></th></tr>'+data.map(q=>'<tr><td>'+esc(q.title)+'</td><td><span class="tag">'+esc(q.status)+'</span></td><td>'+q.nb_soumises+'/'+q.nb_tentatives+'</td><td>'+(q.score_moyen!=null?q.score_moyen+'/'+q.score_max:'—')+'</td><td>'
-  +(q.status==='draft'?'<button data-pub="'+q.quiz_id+'">Publier</button> <button data-del="'+q.quiz_id+'">Supprimer</button>':'')
-  +(q.status==='published'?'<button data-lock="'+q.quiz_id+'">Verrouiller</button>':'')
-  +'</td></tr>').join('')+'</table></div>';
- box.querySelectorAll('[data-pub]').forEach(b=>b.onclick=async()=>{const{error}=await sb.rpc('set_quiz_status',{p_quiz_id:b.dataset.pub,p_new_status:'published'});error?toast(error.message,true):(toast('Quiz publié.'),refreshQuizList())});
- box.querySelectorAll('[data-lock]').forEach(b=>b.onclick=async()=>{if(!confirm('Verrouiller ce quiz ? Il ne sera plus modifiable.'))return;const{error}=await sb.rpc('set_quiz_status',{p_quiz_id:b.dataset.lock,p_new_status:'locked'});error?toast(error.message,true):(toast('Quiz verrouillé.'),refreshQuizList())});
- box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Supprimer ce quiz ?'))return;const{error}=await sb.rpc('delete_quiz',{p_quiz_id:b.dataset.del});error?toast(error.message,true):(toast('Quiz supprimé.'),refreshQuizList())});
+  const box=document.getElementById('qzList');if(!box)return;
+  box.innerHTML='<div class="card empty">Chargement des quiz et des résultats…</div>';
+  const{data,error}=await sb.from('quizzes').select('id,title,status,coefficient,linked_assessment_id,created_at,class_id').eq('class_id',M.cls).order('created_at',{ascending:false});
+  if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
+  if(!data?.length){box.innerHTML='<div class="card empty">Aucun quiz pour cette classe.</div>';return}
+  const details=await Promise.all(data.map(async q=>{const r=await sb.rpc('get_quiz_roster',{p_quiz_id:q.id});return {q,roster:r.data||[],error:r.error?.message}}));
+  box.innerHTML=details.map(({q,roster,error:err})=>{
+   const submitted=roster.filter(s=>s.submitted);
+   const average20=submitted.length?submitted.reduce((sum,s)=>sum+(Number(s.score||0)/Math.max(1,Number(s.max_score||1))*20),0)/submitted.length:null;
+   return '<div class="card"><div class="bar"><div style="flex:1"><h3 style="margin:0 0 4px">'+esc(q.title)+'</h3><span class="tag">'+esc(q.status)+'</span> <span class="mu">Coefficient '+esc(String(q.coefficient||1))+'</span></div><div class="grid"><div><div class="k">Copies rendues</div><b>'+submitted.length+' / '+roster.length+'</b></div><div><div class="k">Moyenne du quiz</div><b>'+(average20===null?'—':average20.toFixed(2)+'/20')+'</b></div></div></div>'
+   +(err?'<p class="mu">Détail indisponible : '+esc(err)+'</p>':'<details style="margin-top:10px"><summary>Voir le suivi individuel ('+roster.length+' élèves)</summary><div class="sc"><table><tr><th>Élève</th><th>Statut</th><th>Score quiz</th><th>Note /20</th><th>Date</th></tr>'+roster.map(s=>'<tr><td>'+esc((s.last_name||'')+' '+(s.first_name||''))+'<div class="meta">'+esc(s.student_number||'')+'</div></td><td>'+(s.submitted?'<span class="tag">Rendu</span>':'<span class="tag">En attente</span>')+'</td><td>'+(s.submitted?esc(String(s.score))+'/'+esc(String(s.max_score)):'—')+'</td><td>'+(s.submitted?(Number(s.score||0)/Math.max(1,Number(s.max_score||1))*20).toFixed(2):'—')+'</td><td>'+esc(s.submitted_at?new Date(s.submitted_at).toLocaleString('fr-FR'):'—')+'</td></tr>').join('')+'</table></div></details>')
+   +'<div class="bar" style="margin-top:10px">'+(q.status==='draft'?'<button data-pub="'+q.id+'" class="p">Publier</button> <button data-del="'+q.id+'">Supprimer</button>':'')+(q.status==='published'?'<button data-lock="'+q.id+'">Verrouiller</button>':'')+'</div></div>';
+  }).join('');
+  box.querySelectorAll('[data-pub]').forEach(b=>b.onclick=async()=>{const{error}=await sb.rpc('set_quiz_status',{p_quiz_id:b.dataset.pub,p_new_status:'published'});error?toast(error.message,true):(toast('Quiz publié.'),refreshQuizList())});
+  box.querySelectorAll('[data-lock]').forEach(b=>b.onclick=async()=>{if(!confirm('Verrouiller ce quiz ? Il ne sera plus modifiable.'))return;const{error}=await sb.rpc('set_quiz_status',{p_quiz_id:b.dataset.lock,p_new_status:'locked'});error?toast(error.message,true):(toast('Quiz verrouillé.'),refreshQuizList())});
+  box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Supprimer ce quiz ?'))return;const{error}=await sb.rpc('delete_quiz',{p_quiz_id:b.dataset.del});error?toast(error.message,true):(toast('Quiz supprimé.'),refreshQuizList())});
 }
 function showQuizBuilder(){
  const box=document.getElementById('qzBuilder');
- box.innerHTML='<div class="card"><h3 style="margin-top:0">Nouveau quiz</h3><input id="qbTitle" placeholder="Titre du quiz" style="width:100%;margin-bottom:8px"><div id="qbQuestions"></div><div class="bar" style="margin-top:8px"><button id="qbAddQ">+ Ajouter une question</button><button id="qbSave" class="p">Enregistrer le quiz</button><button id="qbCancel">Annuler</button></div></div>';
+ box.innerHTML='<div class="card"><h3 style="margin-top:0">Nouveau quiz</h3><input id="qbTitle" placeholder="Titre du quiz" style="width:100%;margin-bottom:8px"><div class="field"><label>Coefficient pour la moyenne générale</label><input id="qbCoef" type="number" min="0.1" step="0.1" value="1"></div><div id="qbQuestions"></div><div class="bar" style="margin-top:8px"><button id="qbAddQ">+ Ajouter une question</button><button id="qbSave" class="p">Enregistrer le quiz</button><button id="qbCancel">Annuler</button></div></div>';
  const addQuestion=()=>{
   const qid='qbq'+Math.random().toString(36).slice(2,8);
   const div=document.createElement('div');div.className='card';div.style.marginTop='8px';div.dataset.qbox='1';
@@ -458,7 +464,7 @@ function showQuizBuilder(){
    questions.push({question_text:qtext,points:1,choices});
   }
   if(!questions.length)return toast('Ajoutez au moins une question complète.',true);
-  const{error}=await sb.rpc('create_quiz_with_questions',{p_class_id:M.cls,p_term_id:M.term,p_title:title,p_questions:questions,p_source:'native'});
+  const{error}=await sb.rpc('create_quiz_with_questions',{p_class_id:M.cls,p_term_id:M.term,p_title:title,p_questions:questions,p_source:'native',p_coefficient:coefficient});
   if(error)return toast(error.message,true);
   toast('Quiz créé en brouillon.');box.innerHTML='';refreshQuizList();
  };
