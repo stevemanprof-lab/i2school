@@ -258,8 +258,23 @@ async function refreshEvaluationList(){
  box.innerHTML='<div class="card empty">Chargement des évaluations…</div>';
  const {data,error}=await sb.from('assessments').select('id,title,assessment_date,max_score,coefficient,status,assessment_type').eq('class_id',classId).eq('term_id',termId).eq('subject_id',M.english?.id).order('assessment_date',{ascending:false}).order('created_at',{ascending:false});
  if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
- box.innerHTML=data?.length?'<div class="card sc"><div class="bar"><b>Évaluations d’anglais</b><span class="tag">'+data.length+'</span></div><table><tr><th>Évaluation</th><th>Date</th><th>Type</th><th>Barème</th><th>Coef.</th><th>Statut</th><th></th></tr>'+data.map(a=>'<tr><td><b>'+esc(a.title)+'</b></td><td>'+esc(a.assessment_date||'')+'</td><td>'+esc(a.assessment_type||'—')+'</td><td>/'+a.max_score+'</td><td>'+a.coefficient+'</td><td><span class="tag">'+ST[a.status]+'</span></td><td><button data-grade-id="'+a.id+'">Saisir</button></td></tr>').join('')+'</table></div>':'<div class="card empty">Aucune évaluation d’anglais pour cette classe et ce trimestre.</div>';
+ box.innerHTML=data?.length?'<div class="card sc"><div class="bar"><b>Évaluations d’anglais</b><span class="tag">'+data.length+'</span></div><table><tr><th>Évaluation</th><th>Date</th><th>Type</th><th>Barème</th><th>Coef.</th><th>Statut</th><th>Actions</th></tr>'+data.map(a=>'<tr><td><b>'+esc(a.title)+'</b></td><td>'+esc(a.assessment_date||'')+'</td><td>'+esc(a.assessment_type||'—')+'</td><td>/'+a.max_score+'</td><td>'+a.coefficient+'</td><td><span class="tag">'+ST[a.status]+'</span></td><td><button data-grade-id="'+a.id+'">Saisir</button> '+(a.status==='draft'?'<button data-delete-eval="'+a.id+'" title="Supprimer ce brouillon">Supprimer</button>':'')+'</td></tr>').join('')+'</table><p class="mu">La suppression est proposée uniquement pour les brouillons sans note saisie.</p></div>':'<div class="card empty">Aucune évaluation d’anglais pour cette classe et ce trimestre.</div>';
  box.querySelectorAll('[data-grade-id]').forEach(b=>b.addEventListener('click',()=>gradeGrid(b.dataset.gradeId)));
+ box.querySelectorAll('[data-delete-eval]').forEach(b=>b.addEventListener('click',()=>deleteEvaluation(b.dataset.deleteEval)));
+}
+async function deleteEvaluation(id){
+ const row=await sb.from('assessments').select('title,status').eq('id',id).maybeSingle();
+ if(row.error)return toast(row.error.message,true);
+ if(!row.data)return toast('Évaluation introuvable.',true);
+ if(row.data.status!=='draft')return toast('Seules les évaluations en brouillon peuvent être supprimées.',true);
+ if(!confirm('Confirmer la suppression de l’évaluation « '+row.data.title+' » ?\n\nCette action est définitive. Elle supprimera aussi les lignes de résultats vides associées. Les évaluations publiées ou contenant des notes ne peuvent pas être supprimées ici.'))return;
+ const btn=document.querySelector('[data-delete-eval="'+id+'"]');
+ if(btn)btn.disabled=true;
+ const {error}=await sb.rpc('delete_english_assessment',{p_assessment_id:id});
+ if(error){if(btn)btn.disabled=false;return toast(error.message||'Suppression impossible.',true)}
+ toast('Évaluation supprimée.');
+ const gradeBox=document.getElementById('gradeBox');if(gradeBox)gradeBox.innerHTML='';
+ await refreshEvaluationList();
 }
 function createEvaluation(classId,termId){
  const cls=(M.eclasses||[]).find(x=>x.id===classId);
