@@ -20,6 +20,24 @@ const sb=supabase.createClient('https://bkuhcxgmxrbjydkuklgo.supabase.co','sb_pu
 const app=document.getElementById('app'),toastEl=document.getElementById('toastRoot'),M={};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=n=>n==null?'—':Number(n).toFixed(2),ST={draft:'Brouillon',validated:'Validé',published:'Publié',locked:'Verrouillé'};
+// Cache local de lecture de 10 minutes, isolé par compte et classe.
+const READ_CACHE_TTL=600000;
+function readCacheKey(kind,classId){return 'i2s:v1:'+(M.me?.auth_user_id||M.me?.id||'anonymous')+':'+kind+':'+classId}
+function readCacheGet(kind,classId){try{const k=readCacheKey(kind,classId),raw=localStorage.getItem(k);if(!raw)return null;const x=JSON.parse(raw);if(!x||Date.now()-x.savedAt>READ_CACHE_TTL){localStorage.removeItem(k);return null}return x.data}catch(_){return null}}
+function readCacheSet(kind,classId,data){try{localStorage.setItem(readCacheKey(kind,classId),JSON.stringify({savedAt:Date.now(),data}))}catch(_){}}
+function readCacheInvalidate(classId){for(const k of ['lessons','homework'])try{localStorage.removeItem(readCacheKey(k,classId))}catch(_){}}
+async function loadCahierData(classId){
+ const lessons=readCacheGet('lessons',classId),homework=readCacheGet('homework',classId);
+ if(lessons!==null&&homework!==null)return {lessons,homework};
+ const [lr,hr]=await Promise.all([
+  lessons!==null?Promise.resolve({data:lessons,error:null}):sb.from('lessons').select('id,lesson_date,title,content,classes(name),teachers(first_name,last_name)').eq('class_id',classId).order('lesson_date',{ascending:false}).order('created_at',{ascending:false}).limit(100),
+  homework!==null?Promise.resolve({data:homework,error:null}):sb.from('homework').select('id,due_date,title,description,classes(name),teachers(first_name,last_name)').eq('class_id',classId).order('due_date',{ascending:false}).limit(100)
+ ]);
+ if(lr.error||hr.error)return {error:lr.error||hr.error};
+ if(lessons===null)readCacheSet('lessons',classId,lr.data||[]);
+ if(homework===null)readCacheSet('homework',classId,hr.data||[]);
+ return {lessons:lr.data||[],homework:hr.data||[]};
+}
 function toast(x,bad=false){toastEl.textContent=x;toastEl.className=bad?'bad':'';toastEl.hidden=false;setTimeout(()=>toastEl.hidden=true,3500)}
 function closeModal(){document.getElementById('modalRoot').classList.remove('show')}
 function modal(html){document.getElementById('modalBody').innerHTML=html;document.getElementById('modalRoot').classList.add('show')}
@@ -764,12 +782,9 @@ async function cahier(){
   V().innerHTML='<div class="bar"><h2 style="margin-right:auto">Cahier de textes</h2><button class="p" id="addLesson">+ Cours</button><button id="addHomework">+ Devoir</button></div><div class="card"><div class="two"><div class="field"><label>Classe</label><select id="bookClass">'+classes.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('')+'</select></div><div class="field"><label>Filtre</label><select id="bookFilter"><option value="all">Tout</option><option value="lessons">Cours</option><option value="homework">Devoirs</option></select></div></div></div><div id="bookList"></div>';
   const load=async()=>{
    const cid=bookClass.value;
-   const [lr,hr]=await Promise.all([
-    sb.from('lessons').select('id,lesson_date,title,content,classes(name),teachers(first_name,last_name)').eq('class_id',cid).order('lesson_date',{ascending:false}).order('created_at',{ascending:false}).limit(100),
-    sb.from('homework').select('id,due_date,title,description,classes(name),teachers(first_name,last_name)').eq('class_id',cid).order('due_date',{ascending:false}).limit(100)
-   ]);
-   if(lr.error)return toast(lr.error.message,true);if(hr.error)return toast(hr.error.message,true);
-   renderCahierTimeline(lr.data||[],hr.data||[],true);
+   const result=await loadCahierData(cid);
+   if(result.error)return toast(result.error.message,true);
+   renderCahierTimeline(result.lessons,result.homework,true);
   };
   bookClass.onchange=load;bookFilter.onchange=load;
   addLesson.onclick=()=>cahierForm('lesson',bookClass.value,load);addHomework.onclick=()=>cahierForm('homework',bookClass.value,load);
@@ -789,12 +804,9 @@ async function cahier(){
 async function loadLearnerCahier(childId){
  const q=await sb.from('enrollments').select('class_id,classes(name,levels(name))').eq('student_id',childId).is('withdrawn_at',null).order('enrolled_at',{ascending:false}).limit(1).maybeSingle();
  const classId=q.data?.class_id;if(!classId){document.getElementById('learnerCahier').innerHTML='<div class="card empty">Aucune classe active trouvée.</div>';return}
- const [lr,hr]=await Promise.all([
-  sb.from('lessons').select('id,lesson_date,title,content,classes(name),teachers(first_name,last_name)').eq('class_id',classId).order('lesson_date',{ascending:false}).limit(100),
-  sb.from('homework').select('id,due_date,title,description,classes(name),teachers(first_name,last_name)').eq('class_id',classId).order('due_date',{ascending:false}).limit(100)
- ]);
- if(lr.error)return toast(lr.error.message,true);if(hr.error)return toast(hr.error.message,true);
- renderCahierTimeline(lr.data||[],hr.data||[],false,document.getElementById('learnerCahier'));
+ const result=await loadCahierData(classId);
+ if(result.error)return toast(result.error.message,true);
+ renderCahierTimeline(result.lessons,result.homework,false,document.getElementById('learnerCahier'));
 }
 function renderCahierTimeline(lessons,homeworks,manage=false,target=null){
  const filter=document.getElementById('bookFilter')?.value||'all';
@@ -807,8 +819,8 @@ function renderCahierTimeline(lessons,homeworks,manage=false,target=null){
  '<div class="card"><div class="bar"><b>Chronologie</b><span class="tag">'+events.length+' entrée(s)</span></div>'+events.map((x,i)=>'<div class="msg '+(i===0?'unread':'')+'" style="border-left:4px solid '+(x.type==='lesson'?'var(--ac)':'var(--yl)')+'"><div class="meta">'+formatDay(x.date)+' · '+(x.type==='lesson'?'COURS':'DEVOIR')+'</div><b>'+esc(x.title)+'</b><p style="white-space:pre-wrap;margin:6px 0">'+esc(x.body||'')+'</p>'+(x.teacher?'<div class="meta">Enseignant : '+esc((x.teacher.first_name||'')+' '+(x.teacher.last_name||''))+'</div>':'')+(manage?'<div class="bar" style="margin-top:8px">'+(x.type==='lesson'?'<button data-del-lesson="'+x.id+'">Supprimer</button>':'<button data-del-homework="'+x.id+'">Supprimer</button>')+'</div>':'')+'</div>').join('')+(events.length?'':'<div class="empty">Aucun cours ou devoir enregistré.</div>')+'</div>';
  if(target)target.innerHTML=html;else V().querySelector('#bookList').innerHTML=html;
  if(manage){
-  V().querySelectorAll('[data-del-lesson]').forEach(b=>b.onclick=async()=>{if(!confirm('Supprimer ce cours ?'))return;const {error}=await sb.from('lessons').delete().eq('id',b.dataset.delLesson);if(error)toast(error.message,true);else document.getElementById('bookClass')?.dispatchEvent(new Event('change'))});
-  V().querySelectorAll('[data-del-homework]').forEach(b=>b.onclick=async()=>{const item=b.closest('.msg');const title=item?.querySelector('b')?.textContent?.trim()||'ce devoir';if(!confirm('Confirmer la suppression du devoir « '+title+' » ? Un code d’accès administrateur sera exigé.'))return;const adminCode=await requestAdminDeleteCode();if(!adminCode)return toast('Suppression annulée : code non saisi.',true);b.disabled=true;const {error}=await sb.rpc('delete_homework',{p_homework_id:b.dataset.delHomework,p_admin_code:adminCode});if(error){b.disabled=false;toast(error.message,true)}else{toast('Devoir supprimé.');document.getElementById('bookClass')?.dispatchEvent(new Event('change'))}});
+  V().querySelectorAll('[data-del-lesson]').forEach(b=>b.onclick=async()=>{if(!confirm('Supprimer ce cours ?'))return;const {error}=await sb.from('lessons').delete().eq('id',b.dataset.delLesson);if(error)toast(error.message,true);else{readCacheInvalidate(bookClass.value);document.getElementById('bookClass')?.dispatchEvent(new Event('change'))}});
+  V().querySelectorAll('[data-del-homework]').forEach(b=>b.onclick=async()=>{const item=b.closest('.msg');const title=item?.querySelector('b')?.textContent?.trim()||'ce devoir';if(!confirm('Confirmer la suppression du devoir « '+title+' » ? Un code d’accès administrateur sera exigé.'))return;const adminCode=await requestAdminDeleteCode();if(!adminCode)return toast('Suppression annulée : code non saisi.',true);b.disabled=true;const {error}=await sb.rpc('delete_homework',{p_homework_id:b.dataset.delHomework,p_admin_code:adminCode});if(error){b.disabled=false;toast(error.message,true)}else{readCacheInvalidate(bookClass.value);toast('Devoir supprimé.');document.getElementById('bookClass')?.dispatchEvent(new Event('change'))}});
  }
 }
 async function cahierForm(kind,classId,refresh){
@@ -821,7 +833,7 @@ async function cahierForm(kind,classId,refresh){
   if(!teacherId)return toast('Aucun profil enseignant associé à ce compte.',true);
   let payload=kind==='lesson'?{school_id:M.me.school_id,academic_year_id:M.eclasses.find(x=>x.id===classId)?.academic_year_id,class_id:classId,subject_id:M.english.id,teacher_id:teacherId,lesson_date:cfDate.value,title:cfTitle.value.trim(),content:cfContent.value.trim()||null}:{school_id:M.me.school_id,academic_year_id:M.eclasses.find(x=>x.id===classId)?.academic_year_id,class_id:classId,subject_id:M.english.id,teacher_id:teacherId,due_date:cfDate.value,title:cfTitle.value.trim(),description:cfContent.value.trim()||null};
   const {error}=await sb.from(kind==='lesson'?'lessons':'homework').insert(payload);
-  if(error)toast(error.message,true);else{closeModal();toast(kind==='lesson'?'Cours ajouté au cahier.':'Devoir ajouté au cahier.');refresh()}
+  if(error)toast(error.message,true);else{readCacheInvalidate(classId);closeModal();toast(kind==='lesson'?'Cours ajouté au cahier.':'Devoir ajouté au cahier.');refresh()}
  };
 }
 async function edt(){
