@@ -186,7 +186,7 @@ async function access(){
  ]);
  if(st.error||pa.error){V().innerHTML='<div class="card">'+esc(st.error?.message||pa.error?.message||'Erreur de chargement')+'</div>';return}
  const students=st.data||[], parents=pa.data||[];
- V().innerHTML='<div class="card hero"><h2 style="margin:0 0 6px">Accès utilisateurs</h2><div class="mu">Créez un accès sécurisé pour un élève ou un parent. I2School envoie directement l’invitation par e-mail.</div></div>'+
+ V().innerHTML='<div class="card hero"><h2 style="margin:0 0 6px">Accès utilisateurs</h2><div class="mu">Pour un élève, une adresse technique @eleves.i2school.local crée un accès sans e-mail de confirmation. Un mot de passe provisoire est affiché une seule fois. Les autres comptes continuent à recevoir une invitation par e-mail.</div></div>'+
  '<div class="card sc"><div class="bar"><b>Élèves</b><span class="tag">'+students.length+' élèves</span></div>'+
  '<table><tr><th>Élève</th><th>Matricule</th><th>E-mail</th><th>Accès</th><th></th></tr>'+
  students.map(x=>'<tr><td><b>'+esc(x.last_name)+' '+esc(x.first_name)+'</b></td><td>'+esc(x.student_number||'—')+'</td><td>'+esc(x.email||'—')+'</td><td><span class="tag">'+(x.profile_id?'Accès créé':'Pas encore d’accès')+'</span></td><td><button data-edit-student="'+x.id+'" data-first="'+esc(x.first_name||'')+'" data-last="'+esc(x.last_name||'')+'">✎ Modifier le nom</button> '+(x.profile_id?'<span class="mu">Déjà activé</span>':'<button data-grant="student" data-id="'+x.id+'">Donner un accès</button>')+'</td></tr>').join('')+
@@ -200,29 +200,27 @@ async function access(){
 }
 async function grantAccess(kind,id){
  const label=kind==='student'?'élève':'parent';
- const current=await (kind==='student'
-   ? sb.from('students').select('first_name,last_name,email,profile_id').eq('id',id).maybeSingle()
-   : sb.from('parents').select('first_name,last_name,email,profile_id').eq('id',id).maybeSingle());
+ const current=await (kind==='student'?sb.from('students').select('first_name,last_name,email,profile_id').eq('id',id).maybeSingle():sb.from('parents').select('first_name,last_name,email,profile_id').eq('id',id).maybeSingle());
  if(current.error||!current.data){toast('Utilisateur introuvable',true);return}
  if(current.data.profile_id){toast('Cet utilisateur possède déjà un accès.',true);return}
- const email=prompt('Adresse e-mail de '+label+' '+current.data.first_name+' '+current.data.last_name+':',current.data.email||'');
+ const defaultEmail=kind==='student'?'3e-m1-001@eleves.i2school.local':(current.data.email||'');
+ const email=prompt('Adresse e-mail de '+label+' '+current.data.first_name+' '+current.data.last_name+':',current.data.email||defaultEmail);
  if(email===null)return;
- const clean=email.trim().toLowerCase();
- if(!clean||!/^\S+@\S+\.\S+$/.test(clean)){toast('Adresse e-mail invalide.',true);return}
- if(!confirm('Envoyer une invitation à '+clean+' ?'))return;
- const {data,error}=await sb.functions.invoke('admin-invite-user',{body:{
-   email:clean,first_name:current.data.first_name,last_name:current.data.last_name,role:kind,school_id:M.me.school_id
- }});
- if(error){toast(error.message||'Invitation impossible',true);return}
- const profileId=data?.profile?.id;
- if(!profileId){toast('Invitation envoyée mais le profil n’a pas été retourné.',true);return}
+ const clean=email.trim().toLowerCase(),internal=kind==='student'&&/^[a-z0-9._-]+@eleves\.i2school\.local$/.test(clean);
+ if(!clean||(!internal&&!/^\S+@\S+\.\S+$/.test(clean))){toast('Adresse e-mail invalide.',true);return}
+ if(!confirm(internal?'Créer un accès direct pour '+current.data.first_name+' '+current.data.last_name+' avec '+clean+' ? Aucun e-mail ne sera envoyé.':'Envoyer une invitation à '+clean+' ?'))return;
+ const {data,error}=await sb.functions.invoke('admin-invite-user',{body:{email:clean,first_name:current.data.first_name,last_name:current.data.last_name,role:kind,school_id:M.me.school_id}});
+ if(error){toast(error.message||'Création du compte impossible',true);return}
+ const profileId=data?.profile?.id;if(!profileId){toast('Compte créé mais profil non retourné.',true);return}
  const table=kind==='student'?'students':'parents';
  const {error:linkError}=await sb.from(table).update({profile_id:profileId,email:clean}).eq('id',id);
  if(linkError){toast('Compte créé mais liaison au dossier impossible : '+linkError.message,true);return}
- toast('Invitation envoyée à '+clean);
- access();
+ if(data?.temporary_password){
+  modal('<h2>Accès élève créé</h2><p>Identifiant : <b>'+esc(clean)+'</b></p><p>Mot de passe provisoire :</p><p><code style="font-size:18px;overflow-wrap:anywhere">'+esc(data.temporary_password)+'</code></p><p class="mu">Note ou copie ce mot de passe maintenant. Il ne sera plus affiché. L’élève devra choisir un nouveau mot de passe après sa première connexion.</p><div class="bar"><button id="copyTempPassword">Copier le mot de passe</button><button class="p" id="closeTempPassword">J’ai noté le mot de passe</button></div>');
+  document.getElementById('copyTempPassword').onclick=async()=>{try{await navigator.clipboard.writeText(data.temporary_password);toast('Mot de passe copié.')}catch(_){toast('Copie automatique indisponible : sélectionne le mot de passe.',true)}};
+  document.getElementById('closeTempPassword').onclick=()=>{closeModal();access()};
+ }else{toast('Invitation envoyée à '+clean);access()}
 }
-
 async function classes(){
  V().innerHTML='<div class="bar"><select id="classPick"></select>'+(M.staff?'<button class="p" id="newStudentBtn">+ Nouvel élève</button>':'')+'<button id="addExistingBtnTop">Ajouter un élève existant</button></div><div id="rosterView"></div>';
  const pick=document.getElementById('classPick');
