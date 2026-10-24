@@ -218,10 +218,11 @@ async function access(){
 }
 async function grantAccess(kind,id){
  const label=kind==='student'?'élève':'parent';
- const current=await (kind==='student'?sb.from('students').select('first_name,last_name,email,profile_id').eq('id',id).maybeSingle():sb.from('parents').select('first_name,last_name,email,profile_id').eq('id',id).maybeSingle());
+ const current=await (kind==='student'?sb.from('students').select('first_name,last_name,email,profile_id,student_number').eq('id',id).maybeSingle():sb.from('parents').select('first_name,last_name,email,profile_id').eq('id',id).maybeSingle());
  if(current.error||!current.data){toast('Utilisateur introuvable',true);return}
  if(current.data.profile_id){toast('Cet utilisateur possède déjà un accès.',true);return}
- const defaultEmail=kind==='student'?'3e-m1-001@eleves.i2school.local':(current.data.email||'');
+ const studentSlug=String(current.data.student_number||'').toLowerCase().replace(/[^a-z0-9._-]/g,'-');
+ const defaultEmail=kind==='student'&&studentSlug?studentSlug+'@eleves.i2school.local':(current.data.email||'');
  const email=prompt('Adresse e-mail de '+label+' '+current.data.first_name+' '+current.data.last_name+':',current.data.email||defaultEmail);
  if(email===null)return;
  const clean=email.trim().toLowerCase(),internal=kind==='student'&&/^[a-z0-9._-]+@eleves\.i2school\.local$/.test(clean);
