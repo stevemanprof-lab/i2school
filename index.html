@@ -447,7 +447,7 @@ async function renderMatrix(){
  html+='</table></div>';
  box.innerHTML=html;
 
- document.getElementById('mxPdf').onclick=()=>window.print();
+ document.getElementById('mxPdf').onclick=()=>printSchoolReport(classId,termId);
  document.getElementById('mxXlsx').onclick=()=>{
   if(typeof XLSX==='undefined')return toast('La bibliothèque Excel ne s’est pas chargée. Vérifiez votre connexion.',true);
   const wb=XLSX.utils.table_to_book(document.getElementById('mxTable'),{sheet:'Notes'});
@@ -455,6 +455,29 @@ async function renderMatrix(){
   const termName=(M.terms||[]).find(x=>x.id===termId)?.name||'trimestre';
   XLSX.writeFile(wb,'Notes_'+clsName.replace(/\s+/g,'_')+'_'+termName.replace(/\s+/g,'_')+'.xlsx');
  };
+}
+async function printSchoolReport(classId,termId){
+ const [{data:roster,error:re},{data:assess,error:ae},{data:term,error:te}] = await Promise.all([
+  sb.from('enrollments').select('student_id,students(id,first_name,last_name,student_number)').eq('class_id',classId).is('withdrawn_at',null),
+  sb.from('assessments').select('id,title,assessment_date,max_score,status').eq('class_id',classId).eq('term_id',termId).eq('subject_id',M.english?.id).order('assessment_date',{ascending:true}).order('created_at',{ascending:true}).limit(6),
+  sb.from('terms').select('name').eq('id',termId).maybeSingle()
+ ]);
+ if(re||ae||te){toast((re||ae||te).message,true);return}
+ const students=(roster||[]).map(x=>x.students).filter(Boolean).sort((a,b)=>String(a.last_name||'').localeCompare(String(b.last_name||''),'fr'));
+ const tests=assess||[];
+ const {data:results,error}=tests.length?await sb.from('assessment_results').select('assessment_id,student_id,score,status').in('assessment_id',tests.map(a=>a.id)): {data:[],error:null};
+ if(error){toast(error.message,true);return}
+ const cells={};(results||[]).forEach(r=>cells[r.assessment_id+'|'+r.student_id]=r);
+ const cls=(M.eclasses||[]).find(c=>c.id===classId);
+ const teacher=M.teacher||{};
+ const teacherName=[teacher.first_name,teacher.last_name].filter(Boolean).join(' ')||'';
+ const safe=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+ const rows=students.map((s,i)=>'<tr><td class="num">'+(i+1)+'</td><td class="id">'+safe(s.student_number||'')+'</td><td class="name">'+safe((s.last_name||'')+' '+(s.first_name||''))+'</td>'+Array.from({length:6},(_,j)=>{const a=tests[j];const r=a&&cells[a.id+'|'+s.id];return '<td class="mark">'+(r?(r.status==='present'&&r.score!=null?safe(money(r.score)):(r.status==='absent'?'Abs.':r.status==='excused'?'Disp.':'')):'')+'</td>'}).join('')+'</tr>').join('');
+ const title='RELEVÉ DE NOTES DU 1er TRIMESTRE 2026-2027';
+ const win=window.open('','_blank');
+ if(!win){toast('Autorisez les fenêtres pop-up pour imprimer le relevé.',true);return}
+ win.document.write('<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>'+title+'</title><style>@page{size:A4 landscape;margin:9mm}*{box-sizing:border-box}body{font:10px Arial,sans-serif;color:#111;margin:0}.top{display:flex;justify-content:space-between;align-items:center;font-size:10px}.school{text-align:center;line-height:1.45}.title{text-align:center;font-weight:bold;font-size:15px;margin:12px 0}.meta{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:0;border:1px solid #444;margin-bottom:8px}.meta div{padding:7px;border-right:1px solid #444}.meta div:last-child{border:0}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #444;padding:4px 3px;height:22px}th{text-align:center;background:#f4f4f4}.num{width:28px;text-align:center}.id{width:150px;font-size:9px}.name{width:250px}.mark{text-align:center;width:9%}thead{display:table-header-group}tr{break-inside:avoid}@media print{button{display:none}}</style></head><body><div class="top"><div>Ministère de l’Éducation Nationale<br><b>LYCÉE MIKOLONGO</b><br>Libreville · Tél. 011 31 77 77<br>mikolongo@gmail.com</div><div class="school"><b>Ministère de l’Éducation Nationale</b><br><b>Lycée Mikolongo</b></div><div style="text-align:right">Ministère de l’Éducation Nationale</div></div><div class="title">'+title+'</div><div class="meta"><div><b>Nom de l’enseignant :</b> '+safe(teacherName)+'</div><div><b>Classe :</b> '+safe(cls?.name||'')+'</div><div><b>Matière :</b> '+safe(M.english?.name||'Anglais')+'</div><div><b>Période :</b> '+safe(term?.name||'1er trimestre')+'</div></div><table><thead><tr><th class="num">N°</th><th class="id">ID-UA</th><th class="name">Nom de l’Apprenant</th>'+[1,2,3,4,5,6].map(n=>'<th class="mark">'+n+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>');
+ win.document.close();
 }
 function parseMoodleXml(xmlText){
  const doc=new DOMParser().parseFromString(xmlText,'application/xml');
