@@ -466,12 +466,14 @@ function reportClassLabel(name){
  return m?(m[1]+' '+rest).trim():n;
 }
 async function printSchoolReport(classId,termId){
- const [{data:official,error:oe},{data:assess,error:ae},{data:term,error:te}] = await Promise.all([
+ const [{data:official,error:oe},{data:assess,error:ae},{data:term,error:te},{data:avgs,error:ge}] = await Promise.all([
   sb.from('official_roster').select('roll_no,school_matricule,full_name,student_id').eq('class_id',classId).order('roll_no',{ascending:true}),
   sb.from('assessments').select('id,title,assessment_date,max_score,status').eq('class_id',classId).eq('term_id',termId).eq('subject_id',M.english?.id).order('assessment_date',{ascending:true}).order('created_at',{ascending:true}).limit(6),
-  sb.from('terms').select('name').eq('id',termId).maybeSingle()
+  sb.from('terms').select('name').eq('id',termId).maybeSingle(),
+  sb.from('v_subject_term_averages').select('student_id,moyenne').eq('class_id',classId).eq('term_id',termId).eq('subject_id',M.english?.id)
  ]);
- if(oe||ae||te){toast((oe||ae||te).message,true);return}
+ if(oe||ae||te||ge){toast((oe||ae||te||ge).message,true);return}
+ const avgBy={};(avgs||[]).forEach(a=>avgBy[a.student_id]=a.moyenne);
  let lines;
  if(official&&official.length){
   lines=official.map(o=>({no:o.roll_no,mat:o.school_matricule,name:o.full_name,sid:o.student_id}));
@@ -491,7 +493,7 @@ async function printSchoolReport(classId,termId){
  const teacherName=[teacher.first_name,teacher.last_name].filter(Boolean).join(' ')||'';
  const safe=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
  const mark=(t,sid)=>{const r=t&&sid&&cells[t.id+'|'+sid];if(!r)return '';if(r.status==='present'&&r.score!=null)return safe(money(r.score));return r.status==='absent'?'Abs.':r.status==='excused'?'Disp.':''};
- const rows=lines.map(l=>'<tr><td class="num">'+safe(l.no)+'</td><td class="id">'+safe(l.mat)+'</td><td class="name">'+safe(l.name)+'</td>'+[0,1,2,3,4,5].map(j=>'<td class="mark">'+mark(tests[j],l.sid)+'</td>').join('')+'</tr>').join('');
+ const rows=lines.map(l=>'<tr><td class="num">'+safe(l.no)+'</td><td class="id">'+safe(l.mat)+'</td><td class="name">'+safe(l.name)+'</td>'+[0,1,2,3,4,5].map(j=>'<td class="mark">'+mark(tests[j],l.sid)+'</td>').join('')+'<td class="avg">'+(avgBy[l.sid]!=null?safe(money(avgBy[l.sid])):'')+'</td></tr>').join('');
  const title='RELEVE DE NOTES DU 1er TRIMESTRE 2026-2027';
  const win=window.open('','_blank');
  if(!win){toast('Autorisez les fenêtres pop-up pour imprimer le relevé.',true);return}
@@ -504,7 +506,7 @@ async function printSchoolReport(classId,termId){
  +'.gap{height:4mm}'
  +'.lst th{background:#d9d9d9;border:1px solid #777;font-size:12px;padding:2px;height:6.2mm}.lst th.dim{background:#ececec;color:#8a8a8a}'
  +'.lst td{border:1px solid #777;padding:0 3px;height:5.1mm;line-height:1.1;font-size:10.5px;overflow:hidden}'
- +'.num{width:5%;text-align:center}.id{width:15%;white-space:nowrap}.name{width:30%}.mark{width:8.33%;text-align:center}'
+ +'.num{width:5%;text-align:center}.id{width:15%;white-space:nowrap}.name{width:30%}.mark{width:7%;text-align:center}.avg{width:8%;text-align:center;font-weight:bold}'
  +'thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}';
  win.document.write('<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>'+title+'</title><style>'+css+'</style></head><body>'
  +'<div class="top"><div class="left"><img src="'+LOGO_LYCEE+'" alt=""><div class="tx"><div class="serif"><i>Ministère de l’Education Nationale</i></div><div><b>LYCEE MIKOLONGO</b></div><div><b>Adresse:</b> 412 G1 11377</div><div>lmikolongo@gmail.com Téléphone:</div></div></div>'
@@ -512,7 +514,7 @@ async function printSchoolReport(classId,termId){
  +'<div class="title">'+title+'</div>'
  +'<table class="meta"><colgroup><col style="width:36%"><col style="width:26%"><col style="width:22%"><col style="width:16%"></colgroup><tr><th>Nom de l’Enseignant</th><th>Classe</th><th>Matières</th><th>Période</th></tr><tr><td>'+safe(teacherName)+'</td><td>'+safe(reportClassLabel(cls?.name))+'</td><td>'+safe(M.english?.name||'Anglais')+'</td><td>'+safe(term?.name||'')+'</td></tr></table>'
  +'<div class="gap"></div>'
- +'<table class="lst"><thead><tr><th class="num">No</th><th class="id">ID-UA</th><th class="name">Nom de l’Apprenant</th>'+[1,2,3,4,5,6].map(n=>'<th class="mark'+(n>4?' dim':'')+'">'+n+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table>'
+ +'<table class="lst"><thead><tr><th class="num">No</th><th class="id">ID-UA</th><th class="name">Nom de l’Apprenant</th>'+[1,2,3,4,5,6].map(n=>'<th class="mark'+(n>4?' dim':'')+'">'+n+'</th>').join('')+'<th class="avg">Moyenne</th></tr></thead><tbody>'+rows+'</tbody></table>'
  +'<script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script></body></html>');
  win.document.close();
 }
