@@ -743,21 +743,44 @@ function announcementForm(){
 }
 
 async function inbox(){
- const {data,error}=await sb.from('messages').select('id,sender_profile_id,recipient_profile_id,student_id,subject,body,read_at,created_at,sender:profiles!messages_sender_profile_id_fkey(first_name,last_name,role)').or('sender_profile_id.eq.'+M.me.id+',recipient_profile_id.eq.'+M.me.id).order('created_at',{ascending:false}).limit(80);
+ const {data,error}=await sb.from('messages').select('id,sender_profile_id,recipient_profile_id,student_id,subject,body,read_at,created_at,sender:profiles!messages_sender_profile_id_fkey(first_name,last_name,role)').or('sender_profile_id.eq.'+M.me.id+',recipient_profile_id.eq.'+M.me.id).order('created_at',{ascending:false}).limit(100);
  if(error)return toast(error.message,true);
- V().innerHTML='<div class="bar"><h2 style="margin-right:auto">Messages</h2><button class="p" id="newMsg">+ Nouveau message</button></div>'+(data||[]).map(x=>'<div class="msg '+(!x.read_at&&x.recipient_profile_id===M.me.id?'unread':'')+'"><div class="meta">'+(x.recipient_profile_id===M.me.id?'De : ':'À : ')+esc(x.sender?.first_name||'')+' '+esc(x.sender?.last_name||'')+' · '+new Date(x.created_at).toLocaleString('fr-FR')+'</div><b>'+esc(x.subject)+'</b><p style="white-space:pre-wrap">'+esc(x.body)+'</p><div class="bar">'+(!x.read_at&&x.recipient_profile_id===M.me.id?'<button data-read="'+x.id+'">Marquer comme lu</button>':'')+'<button data-delete-msg="'+x.id+'">Supprimer pour moi</button></div></div>').join('')||'<div class="card empty">Aucun message.</div>';
- document.querySelectorAll('[data-read]').forEach(b=>b.onclick=async()=>{const {error}=await sb.rpc('mark_message_read',{p_message_id:b.dataset.read});if(error)toast(error.message,true);else inbox()});
- document.querySelectorAll('[data-delete-msg]').forEach(b=>b.onclick=async()=>{if(!confirm('Supprimer ce message pour vous ?'))return;const {error}=await sb.rpc('delete_my_message',{p_message_id:b.dataset.deleteMsg});if(error)toast(error.message,true);else{toast('Message supprimé pour vous.');inbox()}});
- newMsg.onclick=messageForm
+ const messages=data||[];
+ V().innerHTML='<div class="bar"><h2 style="margin-right:auto">Messages</h2><button class="p" id="newMsg">+ Nouveau message</button></div><div class="card"><div class="field"><label>Rechercher dans les messages</label><input id="msgSearch" placeholder="Nom, objet ou contenu…"></div><div class="bar"><button id="filterAll" class="b">Tous</button><button id="filterUnread">Non lus</button><button id="filterReceived">Reçus</button><button id="filterSent">Envoyés</button></div></div><div id="messageList"></div>';
+ let filter='all';
+ const render=()=>{
+  const term=(document.getElementById('msgSearch')?.value||'').toLocaleLowerCase('fr');
+  const shown=messages.filter(x=>{
+   const received=x.recipient_profile_id===M.me.id;
+   const hay=[x.sender?.first_name,x.sender?.last_name,x.subject,x.body].join(' ').toLocaleLowerCase('fr');
+   return (filter==='all'||(filter==='unread'&&received&&!x.read_at)||(filter==='received'&&received)||(filter==='sent'&&!received))&&hay.includes(term);
+  });
+  document.getElementById('messageList').innerHTML=shown.map(x=>{
+   const received=x.recipient_profile_id===M.me.id;
+   const target=received?x.sender_profile_id:x.recipient_profile_id;
+   const targetSubject=/^re\s*:/i.test(x.subject||'')?(x.subject||''):'Re : '+(x.subject||'(sans objet)');
+   return '<div class="msg '+(received&&!x.read_at?'unread':'')+'"><div class="meta">'+(received?'Reçu de : ':'Envoyé à : ')+esc(x.sender?.first_name||'')+' '+esc(x.sender?.last_name||'')+' · '+new Date(x.created_at).toLocaleString('fr-FR')+'</div><b>'+esc(x.subject)+'</b><p style="white-space:pre-wrap">'+esc(x.body)+'</p><div class="bar"><button class="p" data-reply="'+esc(target)+'" data-subject="'+esc(targetSubject)+'">↩ Répondre</button>'+(received&&!x.read_at?'<button data-read="'+x.id+'">Marquer comme lu</button>':'')+'<button data-delete-msg="'+x.id+'">Supprimer pour moi</button></div></div>'
+  }).join('')||(messages.length?'<div class="card empty">Aucun message ne correspond à votre recherche.</div>':'<div class="card empty">Aucun message.</div>');
+  document.querySelectorAll('[data-reply]').forEach(b=>b.onclick=()=>messageForm(b.dataset.reply,b.dataset.subject));
+  document.querySelectorAll('[data-read]').forEach(b=>b.onclick=async()=>{const {error}=await sb.rpc('mark_message_read',{p_message_id:b.dataset.read});if(error)toast(error.message,true);else inbox()});
+  document.querySelectorAll('[data-delete-msg]').forEach(b=>b.onclick=async()=>{if(!confirm('Supprimer ce message pour vous ?'))return;const {error}=await sb.rpc('delete_my_message',{p_message_id:b.dataset.deleteMsg});if(error)toast(error.message,true);else{toast('Message supprimé pour vous.');inbox()}});
+ };
+ document.getElementById('msgSearch').oninput=render;
+ [['filterAll','all'],['filterUnread','unread'],['filterReceived','received'],['filterSent','sent']].forEach(([id,value])=>document.getElementById(id).onclick=()=>{filter=value;document.querySelectorAll('#filterAll,#filterUnread,#filterReceived,#filterSent').forEach(b=>b.classList.toggle('b',b.id===id));render()});
+ document.getElementById('newMsg').onclick=()=>messageForm();
+ render();
 }
-async function messageForm(){
+async function messageForm(preselectedRecipient=null,replySubject=''){
  let recipients=[];
  const {data,error}=await sb.rpc('get_my_message_recipients');
  if(error){toast(error.message||'Impossible de charger les destinataires.',true);return}
- recipients=data||[];
+ recipients=(data||[]).sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'','fr',{sensitivity:'base'})||(a.first_name||'').localeCompare(b.first_name||'','fr',{sensitivity:'base'}));
  if(!recipients.length)return toast('Aucun destinataire disponible',true);
- modal('<button class="close" onclick="closeModal()">×</button><h2>Nouveau message</h2><div class="field"><label>Destinataire</label><select id="mr">'+opts(recipients,'profile_id',x=>x.first_name+' '+x.last_name+' · '+x.role+(x.class_name?' · '+x.class_name:''))+'</select></div><div class="field"><label>Objet *</label><input id="ms"></div><div class="field"><label>Message *</label><textarea id="mb"></textarea></div><button class="p" id="sendMsg">Envoyer</button>');
- sendMsg.onclick=async()=>{if(!ms.value.trim()||!mb.value.trim())return toast('Objet et message obligatoires',true);const {error}=await sb.from('messages').insert({school_id:M.me.school_id,sender_profile_id:M.me.id,recipient_profile_id:mr.value,student_id:M.student?.id||null,subject:ms.value.trim(),body:mb.value.trim()});if(error)toast(error.message,true);else{closeModal();toast('Message envoyé');inbox()}}
+ const recipientExists=recipients.some(x=>x.profile_id===preselectedRecipient);
+ if(preselectedRecipient&&!recipientExists){toast('Ce correspondant n’est plus disponible. Choisissez un destinataire.',true);preselectedRecipient=null}
+ modal('<button class="close" onclick="closeModal()">×</button><h2>'+(preselectedRecipient?'Répondre au message':'Nouveau message')+'</h2><div class="field"><label>Rechercher un correspondant</label><input id="recipientSearch" placeholder="Tapez un nom…"></div><div class="field"><label>Destinataire</label><select id="mr">'+opts(recipients,'profile_id',x=>x.last_name+' '+x.first_name+' · '+x.role+(x.class_name?' · '+x.class_name:''),preselectedRecipient)+'</select></div><div class="field"><label>Objet *</label><input id="ms" value="'+esc(replySubject)+'"></div><div class="field"><label>Message *</label><textarea id="mb" placeholder="Écrivez votre message…"></textarea></div><div class="bar"><button onclick="closeModal()">Annuler</button><button class="p" id="sendMsg">Envoyer</button></div>');
+ recipientSearch.oninput=()=>{const term=recipientSearch.value.toLocaleLowerCase('fr');const selected=mr.value;const filtered=recipients.filter(x=>(x.first_name+' '+x.last_name+' '+x.role+' '+(x.class_name||'')).toLocaleLowerCase('fr').includes(term));mr.innerHTML=opts(filtered,'profile_id',x=>x.last_name+' '+x.first_name+' · '+x.role+(x.class_name?' · '+x.class_name:''),selected);if(!filtered.some(x=>x.profile_id===selected)&&filtered.length)mr.value=filtered[0].profile_id};
+ sendMsg.onclick=async()=>{if(!mr.value)return toast('Choisissez un destinataire.',true);if(!ms.value.trim()||!mb.value.trim())return toast('Objet et message obligatoires',true);sendMsg.disabled=true;const {error}=await sb.from('messages').insert({school_id:M.me.school_id,sender_profile_id:M.me.id,recipient_profile_id:mr.value,student_id:M.student?.id||null,subject:ms.value.trim(),body:mb.value.trim()});if(error){sendMsg.disabled=false;toast(error.message,true)}else{closeModal();toast('Message envoyé');inbox()}}
 }
 
 async function getLearnerClassId(){
