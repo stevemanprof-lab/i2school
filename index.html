@@ -722,16 +722,31 @@ async function learnerQuizzes(){
  const{data,error}=await sb.from('quizzes').select('id,title,status,scheduled_at,due_at,time_limit_minutes,max_attempts,correction_released,show_correction_on_finish,scores_published').eq('class_id',classId).in('status',['published','locked']).order('scheduled_at',{ascending:true,nullsFirst:false});
  if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
  if(!data?.length){box.innerHTML='<div class="card empty">Aucun quiz disponible pour le moment.</div>';return}
- const{data:mine}=await sb.rpc('get_my_quiz_attempts',{p_quiz_id:null});
+ const{data:mine,error:mineError}=await sb.rpc('get_my_quiz_attempts',{p_quiz_id:null});
+ if(mineError){box.innerHTML='<div class="card">'+esc(mineError.message)+'</div>';return}
  const byQuiz={};(mine||[]).forEach(a=>(byQuiz[a.quiz_id]=byQuiz[a.quiz_id]||[]).push(a));
  box.innerHTML=data.map(q=>{
-  const attempts=byQuiz[q.id]||[];const active=attempts.find(a=>a.status==='in_progress');const submitted=attempts.filter(a=>a.status==='submitted');const a=active||submitted[0]||null;const done=!active&&submitted.length>=(q.max_attempts||1);const remaining=Math.max(0,(q.max_attempts||1)-submitted.length);
+  const attempts=byQuiz[q.id]||[];
+  const active=attempts.find(a=>a.status==='in_progress');
+  const submitted=attempts.filter(a=>a.status==='submitted');
+  const latest=active||submitted[0]||null;
+  const max=Number(q.max_attempts||1),remaining=Math.max(0,max-submitted.length);
+  const done=!active&&remaining===0;
   const now=Date.now(),future=q.scheduled_at&&now<new Date(q.scheduled_at).getTime(),expired=q.due_at&&now>new Date(q.due_at).getTime();
-  const dates='<p class="meta">Programmation : '+esc(q.scheduled_at?new Date(q.scheduled_at).toLocaleString('fr-FR'):'—')+' · Date butoir : '+esc(q.due_at?new Date(q.due_at).toLocaleString('fr-FR'):'—')+(q.time_limit_minutes?' · Durée : '+esc(String(q.time_limit_minutes))+' min':'')+'</p>';
-  return'<div class="card"><b>'+esc(q.title)+'</b> <span class="tag">'+esc(q.status)+'</span>'+dates
-   +(done?'<p class="mu">Terminé'+(q.scores_published&&a.score!=null?' — score : '+a.score+'/'+a.max_score:' — votre score sera publié par votre enseignant')+'</p>'+((q.correction_released||(q.show_correction_on_finish&&a.status==='submitted'))?'<button data-review="'+a.id+'">Revoir la correction</button>':'<p class="mu">La correction sera disponible quand votre enseignant l’autorisera.</p>')
-     :'<p class="mu">'+(active?'Tentative en cours.':future?'Disponible à partir de la date programmée.':expired?'Date butoir dépassée.':'Tentatives utilisées : '+submitted.length+'/'+(q.max_attempts||1)+'. Tentatives restantes : '+remaining)+'</p><button data-take="'+q.id+'" class="p" '+((future||expired||q.status!=='published'||(!active&&remaining<=0))?'disabled':'')+'>'+(active?'Reprendre la tentative':'Passer le quiz')+'</button>')
-   +'</div>';
+  const dates='<p class="meta">Programmation : '+esc(q.scheduled_at?new Date(q.scheduled_at).toLocaleString('fr-FR'):'—')+' · Date butoir : '+esc(q.due_at?new Date(q.due_at).toLocaleString('fr-FR'):'—')+(q.time_limit_minutes?' · Durée : '+esc(String(q.time_limit_minutes))+' min':'')+' · Tentatives autorisées : '+max+'</p>';
+  let action='';
+  if(active){
+   action='<p class="mu">Une tentative est en cours. Reprenez-la pour terminer avant la fin du temps imparti.</p><button data-take="'+q.id+'" class="p">Reprendre la tentative</button>';
+  }else if(done){
+   action='<p class="mu">Nombre maximal de tentatives atteint ('+submitted.length+'/'+max+').</p>';
+   if(q.correction_released||(q.show_correction_on_finish&&latest?.status==='submitted'))action+='<button data-review="'+latest.id+'">Revoir la correction</button>';
+   else action+='<p class="mu">La correction n’est pas encore autorisée par votre enseignant.</p>';
+  }else{
+   action='<p class="mu">'+(future?'Disponible à partir de la date programmée.':expired?'Date butoir dépassée.':'Tentatives utilisées : '+submitted.length+'/'+max+'. Tentatives restantes : '+remaining)+'</p><button data-take="'+q.id+'" class="p" '+((future||expired||q.status!=='published')?'disabled':'')+'>Passer le quiz</button>';
+  }
+  if(done&&q.scores_published&&latest?.score!=null)action='<p class="mu">Terminé — score : '+latest.score+'/'+latest.max_score+'</p>'+action;
+  else if(done)action='<p class="mu">Quiz terminé. Votre score sera publié par votre enseignant.</p>'+action;
+  return '<div class="card"><b>'+esc(q.title)+'</b> <span class="tag">'+esc(q.status)+'</span>'+dates+action+'</div>';
  }).join('');
  box.querySelectorAll('[data-take]').forEach(b=>b.onclick=()=>takeQuiz(b.dataset.take));
  box.querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>reviewQuiz(b.dataset.review));
@@ -807,7 +822,7 @@ async function takeQuiz(quizId){
  if(M.qzTimer){clearInterval(M.qzTimer);M.qzTimer=null}
  const qinfo=await sb.from('quizzes').select('time_limit_minutes,shuffle_questions,shuffle_choices,allow_back').eq('id',quizId).maybeSingle();
  const limitMin=qinfo.data&&qinfo.data.time_limit_minutes?Number(qinfo.data.time_limit_minutes):null;
- const prev=await sb.rpc('get_my_quiz_attempts',{p_quiz_id:quizId});prev.data=prev.data&&prev.data[0]||null;
+ const prev=await sb.rpc('get_my_quiz_attempts',{p_quiz_id:quizId});prev.data=(prev.data||[]).find(x=>x.status==='in_progress')||null;
  if(limitMin&&!prev.data&&!confirm('Ce quiz dure '+limitMin+' minute(s). Le chronomètre démarre dès que vous cliquez sur OK et ne s’arrête plus. Les questions s’affichent une par une. Commencer maintenant ?'))return;
  const{data,error}=await sb.rpc('get_quiz_for_taking',{p_quiz_id:quizId});
  if(error)return toast(error.message,true);
