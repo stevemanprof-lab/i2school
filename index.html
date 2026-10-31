@@ -635,24 +635,12 @@ async function showQuizBuilder(quizId=null){
    initialQuestions.push({question_text:q.question_text,points:q.points,image_path:q.image_path,choices:(cs||[]).map(c=>({text:c.choice_text,is_correct:c.is_correct}))});
   }
  }
- const subjectId=M.english?.id||null;
- const assessmentQuery=sb.from('assessments').select('id,title,assessment_date,assessment_type,status').eq('class_id',M.cls).eq('subject_id',subjectId).order('assessment_date',{ascending:false});
- if(M.term)assessmentQuery.eq('term_id',M.term);
- if(M.teacher?.id)assessmentQuery.eq('teacher_id',M.teacher.id);
- const homeworkQuery=sb.from('homework').select('id,title,due_date,description').eq('class_id',M.cls).eq('subject_id',subjectId).order('due_date',{ascending:false});
- if(M.teacher?.id)homeworkQuery.eq('teacher_id',M.teacher.id);
- const [assessmentsResult,homeworkResult]=await Promise.all([assessmentQuery,homeworkQuery]);
- const assessmentRows=assessmentsResult.data||[],homeworkRows=homeworkResult.data||[];
- if(assessmentsResult.error)console.warn('Chargement des évaluations liées impossible:',assessmentsResult.error.message);
- if(homeworkResult.error)console.warn('Chargement des devoirs liés impossible:',homeworkResult.error.message);
- const assessmentOptions='<option value="">Aucune évaluation liée</option>'+assessmentRows.map(a=>'<option value="'+esc(a.id)+'"'+(existing?.linked_assessment_id===a.id?' selected':'')+'>'+esc(a.title)+(a.assessment_date?' — '+esc(new Date(a.assessment_date+'T00:00:00').toLocaleDateString('fr-FR')):'')+'</option>').join('');
- const homeworkOptions='<option value="">Aucun devoir lié</option>'+homeworkRows.map(h=>'<option value="'+esc(h.id)+'"'+(existing?.homework_id===h.id?' selected':'')+'>'+esc(h.title)+(h.due_date?' — échéance '+esc(new Date(h.due_date+'T00:00:00').toLocaleDateString('fr-FR')):'')+'</option>').join('');
  const localDate=v=>{if(!v)return '';const d=new Date(new Date(v).getTime()-new Date(v).getTimezoneOffset()*60000);return d.toISOString().slice(0,16)};
  box.innerHTML='<div class="card"><h3 style="margin-top:0">'+(existing?'Modifier le quiz':'Nouveau quiz')+'</h3>'
   +'<label>Titre du quiz</label><input id="qbTitle" value="'+esc(existing?.title||'')+'" placeholder="Titre du quiz" style="width:100%;margin:5px 0 10px">'
   +'<div class="grid"><div class="field"><label>Coefficient pour la moyenne générale</label><input id="qbCoef" type="number" min="0.1" step="0.1" value="'+esc(String(existing?.coefficient||1))+'"></div>'
   +'<div class="field"><label>Date de programmation</label><input id="qbScheduled" type="datetime-local" value="'+localDate(existing?.scheduled_at)+'"></div><div class="field"><label>Date butoir</label><input id="qbDue" type="datetime-local" value="'+localDate(existing?.due_at)+'"></div><div class="field"><label>Durée en minutes (facultatif)</label><input id="qbLimit" type="number" min="1" max="600" step="1" placeholder="Illimitée" value="'+esc(existing&&existing.time_limit_minutes?String(existing.time_limit_minutes):'')+'"></div></div>'
-  +'<div class="grid" style="margin:8px 0 12px"><div class="field"><label for="qbAssessment">Relier à une évaluation</label><select id="qbAssessment" style="width:100%">'+assessmentOptions+'</select><small class="mu">Lier ce quiz à une évaluation de la classe pour son suivi dans les évaluations.</small></div><div class="field"><label for="qbHomework">Ajouter au cahier de texte comme devoir de maison</label><select id="qbHomework" style="width:100%">'+homeworkOptions+'</select><small class="mu">Associer le quiz à un devoir déjà créé dans le cahier de texte.</small></div></div>'
+  +'<div class="card" style="margin:8px 0 12px;padding:10px"><label style="display:block"><input type="checkbox" id="qbCountsAsAssessment"'+(existing&&existing.linked_assessment_id?' checked':'')+'> <b>Compter ce quiz comme une évaluation trimestrielle notée</b></label><small class="mu">En activant cette option, le titre du quiz sera automatiquement ajouté aux évaluations de la classe. Les notes obtenues par les élèves seront reportées dans cette évaluation et prises en compte dans les moyennes du trimestre.</small></div>'
   +'<div style="margin:6px 0 10px"><label style="display:block;margin:4px 0"><input type="checkbox" id="qbShuffleQ"'+(existing&&existing.shuffle_questions?' checked':'')+'> Mélanger l’ordre des questions (différent pour chaque élève)</label><label style="display:block;margin:4px 0"><input type="checkbox" id="qbShuffleC"'+(existing&&existing.shuffle_choices?' checked':'')+'> Mélanger l’ordre des réponses (différent pour chaque élève)</label><label style="display:block;margin:4px 0"><input type="checkbox" id="qbBack"'+(existing&&existing.allow_back?' checked':'')+'> Autoriser le bouton « Précédent » (retour aux questions déjà vues)</label><label style="display:block;margin:4px 0"><input type="checkbox" id="qbShowCorr"'+(existing&&existing.show_correction_on_finish?' checked':'')+'> Afficher la correction à l’élève dès qu’il a terminé le devoir</label><p class="mu" style="margin:4px 0">Si cette case est décochée, vous pourrez toujours autoriser la correction plus tard. Les scores, eux, ne sont visibles des élèves que lorsque vous les publiez.</p></div>'
   +'<p class="mu">Images : formats JPG, PNG, WebP ou GIF. I2School réduit l’image à 1 200 × 900 pixels maximum et à 500 Ko. Elle s’affichera dans une zone limitée pour ne pas déformer la page.</p>'
   +'<div id="qbQuestions"></div><div class="bar" style="margin-top:8px"><button id="qbAddQ">+ Ajouter une question</button><button id="qbSave" class="p">'+(existing?'Enregistrer les modifications':'Enregistrer le quiz')+'</button><button id="qbCancel">Annuler</button></div></div>';
@@ -697,9 +685,22 @@ async function showQuizBuilder(quizId=null){
   else{const r=await sb.rpc('create_quiz_with_questions_v2',{p_class_id:M.cls,p_term_id:M.term,...args,p_source:'native'});error=r.error;newId=r.data}
   if(error){btn.disabled=false;return toast(error.message,true)}
   if(newId){
-   const links={linked_assessment_id:document.getElementById('qbAssessment').value||null,homework_id:document.getElementById('qbHomework').value||null};
-   const linkResult=await sb.from('quizzes').update(links).eq('id',newId);
-   if(linkResult.error){btn.disabled=false;return toast('Quiz enregistré, mais les liens évaluation/devoir n’ont pas pu être enregistrés : '+linkResult.error.message,true)}
+   const countAsAssessment=document.getElementById('qbCountsAsAssessment').checked;
+   const currentAssessmentId=existing?.linked_assessment_id||null;
+   if(countAsAssessment){
+    if(currentAssessmentId){
+     const ar=await sb.from('assessments').update({title,coefficient,assessment_date:due?due.slice(0,10):new Date().toISOString().slice(0,10)}).eq('id',currentAssessmentId);
+     if(ar.error){btn.disabled=false;return toast('Quiz enregistré, mais le titre de son évaluation n’a pas pu être actualisé : '+ar.error.message,true)}
+     const lr=await sb.rpc('set_quiz_links',{p_quiz_id:newId,p_assessment_mode:'keep',p_assessment_id:null,p_homework:null});
+     if(lr.error){btn.disabled=false;return toast('Quiz enregistré, mais la liaison à l’évaluation n’a pas pu être confirmée : '+lr.error.message,true)}
+    }else{
+     const lr=await sb.rpc('set_quiz_links',{p_quiz_id:newId,p_assessment_mode:'new',p_assessment_id:null,p_homework:null});
+     if(lr.error){btn.disabled=false;return toast('Quiz enregistré, mais la création de son évaluation a échoué : '+lr.error.message,true)}
+    }
+   }else if(currentAssessmentId){
+    const lr=await sb.rpc('set_quiz_links',{p_quiz_id:newId,p_assessment_mode:'none',p_assessment_id:null,p_homework:null});
+    if(lr.error){btn.disabled=false;return toast('Quiz enregistré, mais la désactivation de son évaluation a échoué : '+lr.error.message,true)}
+   }
    const lr=await sb.rpc('set_quiz_options',{p_quiz_id:newId,p_minutes:limit,p_shuffle_questions:document.getElementById('qbShuffleQ').checked,p_shuffle_choices:document.getElementById('qbShuffleC').checked,p_allow_back:document.getElementById('qbBack').checked,p_show_correction_on_finish:document.getElementById('qbShowCorr').checked});
    if(lr.error){btn.disabled=false;return toast('Quiz enregistré, mais les options n’ont pas pu être définies : '+lr.error.message,true)}
   }
