@@ -578,7 +578,7 @@ async function staffQuizzes(){
 async function refreshQuizList(){
   const box=document.getElementById('qzList');if(!box)return;
   box.innerHTML='<div class="card empty">Chargement des quiz et des résultats…</div>';
-  const{data,error}=await sb.from('quizzes').select('id,title,status,coefficient,linked_assessment_id,created_at,class_id,source,scheduled_at,due_at,time_limit_minutes,shuffle_questions,shuffle_choices,allow_back,correction_released,show_correction_on_finish,scores_published').eq('class_id',M.cls).order('created_at',{ascending:false});
+  const{data,error}=await sb.from('quizzes').select('id,title,status,coefficient,linked_assessment_id,created_at,class_id,source,scheduled_at,due_at,time_limit_minutes,shuffle_questions,shuffle_choices,allow_back,correction_released,show_correction_on_finish,scores_published,max_attempts').eq('class_id',M.cls).order('created_at',{ascending:false});
   if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
   if(!data?.length){box.innerHTML='<div class="card empty">Aucun quiz pour cette classe.</div>';return}
   const details=await Promise.all(data.map(async q=>{const r=await sb.rpc('get_quiz_roster',{p_quiz_id:q.id});return {q,roster:r.data||[],error:r.error?.message}}));
@@ -588,7 +588,7 @@ async function refreshQuizList(){
    const submitted=roster.filter(s=>s.submitted);
    const average20=submitted.length?submitted.reduce((sum,s)=>sum+(Number(s.score||0)/Math.max(1,Number(s.max_score||1))*20),0)/submitted.length:null;
    return '<div class="card"><div class="bar"><div style="flex:1"><h3 style="margin:0 0 4px">'+esc(q.title)+'</h3><span class="tag">'+esc(q.status)+'</span> <span class="mu">Coefficient '+esc(String(q.coefficient||1))+'</span></div><div class="grid"><div><div class="k">Copies rendues</div><b>'+submitted.length+' / '+roster.length+'</b></div><div><div class="k">Moyenne du quiz</div><b>'+(average20===null?'—':average20.toFixed(2)+'/20')+'</b></div></div></div>'
-   +'<p class="meta">Programmation : '+esc(dateLabel(q.scheduled_at))+' · Date butoir : '+esc(dateLabel(q.due_at))+' · Durée : '+(q.time_limit_minutes?esc(String(q.time_limit_minutes))+' min':'illimitée')+' · Mélange : '+(q.shuffle_questions||q.shuffle_choices?esc([q.shuffle_questions?'questions':'',q.shuffle_choices?'réponses':''].filter(Boolean).join(' + ')):'non')+' · Retour en arrière : '+(q.allow_back?'autorisé':'interdit')+' · Correction affichée à la fin : <b>'+(q.show_correction_on_finish?'oui':'non')+'</b> · Correction autorisée ensuite : <b>'+(q.correction_released?'oui':'non')+'</b> · Scores visibles des élèves : <b>'+(q.scores_published?'oui':'non')+'</b></p>'
+   +'<p class="meta">Programmation : '+esc(dateLabel(q.scheduled_at))+' · Date butoir : '+esc(dateLabel(q.due_at))+' · Durée : '+(q.time_limit_minutes?esc(String(q.time_limit_minutes))+' min':'illimitée')+' · Mélange : '+(q.shuffle_questions||q.shuffle_choices?esc([q.shuffle_questions?'questions':'',q.shuffle_choices?'réponses':''].filter(Boolean).join(' + ')):'non')+' · Tentatives autorisées : '+esc(String(q.max_attempts||1))+' · Retour en arrière : '+(q.allow_back?'autorisé':'interdit')+' · Correction affichée à la fin : <b>'+(q.show_correction_on_finish?'oui':'non')+'</b> · Correction autorisée ensuite : <b>'+(q.correction_released?'oui':'non')+'</b> · Scores visibles des élèves : <b>'+(q.scores_published?'oui':'non')+'</b></p>'
    +(err?'<p class="mu">Détail indisponible : '+esc(err)+'</p>':'<details style="margin-top:10px"><summary>Voir le suivi individuel ('+roster.length+' élèves)</summary><div class="sc"><table><tr><th>Élève</th><th>Statut</th><th>Score quiz</th><th>Note /20</th><th>Date</th></tr>'+roster.map(s=>'<tr><td>'+esc((s.last_name||'')+' '+(s.first_name||''))+'<div class="meta">'+esc(s.student_number||'')+'</div></td><td>'+(s.submitted?'<span class="tag">Rendu</span>':'<span class="tag">En attente</span>')+'</td><td>'+(s.submitted?esc(String(s.score))+'/'+esc(String(s.max_score)):'—')+'</td><td>'+(s.submitted?(Number(s.score||0)/Math.max(1,Number(s.max_score||1))*20).toFixed(2):'—')+'</td><td>'+esc(s.submitted_at?new Date(s.submitted_at).toLocaleString('fr-FR'):'—')+'</td></tr>').join('')+'</table></div></details>')
    +'<div class="bar" style="margin-top:10px">'+'<button data-preview="'+q.id+'">👁 Aperçu élève</button> <button data-scores="'+q.id+'" data-on="'+(q.scores_published?'1':'0')+'">'+(q.scores_published?'🔒 Masquer les scores':'📢 Publier les scores')+'</button> <button data-corr="'+q.id+'" data-on="'+(q.correction_released?'1':'0')+'">'+(q.correction_released?'🔒 Masquer la correction':'✅ Autoriser la correction')+'</button> <button data-edit="'+q.id+'">Modifier</button>'+(q.status==='draft'?'<button data-pub="'+q.id+'" class="p">Publier</button>':'')+(q.status==='published'?'<button data-lock="'+q.id+'">Verrouiller</button>':'')+' <button data-del="'+q.id+'" class="d">Supprimer</button>'+'</div></div>';
   }).join('');
@@ -625,7 +625,7 @@ async function showQuizBuilder(quizId=null){
  let existing=null,initialQuestions=[];
  if(quizId){
   box.innerHTML='<div class="card empty">Chargement du quiz à modifier…</div>';
-  const qr=await sb.from('quizzes').select('id,title,coefficient,scheduled_at,due_at,source,status,time_limit_minutes,shuffle_questions,shuffle_choices,allow_back,show_correction_on_finish,linked_assessment_id,homework_id').eq('id',quizId).single();
+  const qr=await sb.from('quizzes').select('id,title,coefficient,scheduled_at,due_at,source,status,time_limit_minutes,max_attempts,shuffle_questions,shuffle_choices,allow_back,show_correction_on_finish,linked_assessment_id,homework_id').eq('id',quizId).single();
   if(qr.error){box.innerHTML='';return toast(qr.error.message,true)}existing=qr.data;
   const{data:qs,error:qe}=await sb.from('quiz_questions').select('id,position,question_text,points,image_path').eq('quiz_id',quizId).order('position');
   if(qe){box.innerHTML='';return toast(qe.message,true)}
@@ -639,7 +639,7 @@ async function showQuizBuilder(quizId=null){
  box.innerHTML='<div class="card"><h3 style="margin-top:0">'+(existing?'Modifier le quiz':'Nouveau quiz')+'</h3>'
   +'<label>Titre du quiz</label><input id="qbTitle" value="'+esc(existing?.title||'')+'" placeholder="Titre du quiz" style="width:100%;margin:5px 0 10px">'
   +'<div class="grid"><div class="field"><label>Coefficient pour la moyenne générale</label><input id="qbCoef" type="number" min="0.1" step="0.1" value="'+esc(String(existing?.coefficient||1))+'"></div>'
-  +'<div class="field"><label>Date de programmation</label><input id="qbScheduled" type="datetime-local" value="'+localDate(existing?.scheduled_at)+'"></div><div class="field"><label>Date butoir</label><input id="qbDue" type="datetime-local" value="'+localDate(existing?.due_at)+'"></div><div class="field"><label>Durée en minutes (facultatif)</label><input id="qbLimit" type="number" min="1" max="600" step="1" placeholder="Illimitée" value="'+esc(existing&&existing.time_limit_minutes?String(existing.time_limit_minutes):'')+'"></div></div>'
+  +'<div class="field"><label>Date de programmation</label><input id="qbScheduled" type="datetime-local" value="'+localDate(existing?.scheduled_at)+'"></div><div class="field"><label>Date butoir</label><input id="qbDue" type="datetime-local" value="'+localDate(existing?.due_at)+'"></div><div class="field"><label>Durée en minutes (facultatif)</label><input id="qbLimit" type="number" min="1" max="600" step="1" placeholder="Illimitée" value="'+esc(existing&&existing.time_limit_minutes?String(existing.time_limit_minutes):'')+'"></div><div class="field"><label>Nombre maximal de tentatives par élève</label><input id="qbMaxAttempts" type="number" min="1" max="20" step="1" value="'+esc(String(existing?.max_attempts||1))+'"><small class="mu">Chaque élève pourra soumettre le quiz au maximum ce nombre de fois.</small></div></div>'
   +'<div class="card" style="margin:8px 0 12px;padding:10px"><label style="display:block"><input type="checkbox" id="qbCountsAsAssessment"'+(existing&&existing.linked_assessment_id?' checked':'')+'> <b>Compter ce quiz comme une évaluation trimestrielle notée</b></label><small class="mu">En activant cette option, le titre du quiz sera automatiquement ajouté aux évaluations de la classe. Les notes obtenues par les élèves seront reportées dans cette évaluation et prises en compte dans les moyennes du trimestre.</small></div>'
   +'<div style="margin:6px 0 10px"><label style="display:block;margin:4px 0"><input type="checkbox" id="qbShuffleQ"'+(existing&&existing.shuffle_questions?' checked':'')+'> Mélanger l’ordre des questions (différent pour chaque élève)</label><label style="display:block;margin:4px 0"><input type="checkbox" id="qbShuffleC"'+(existing&&existing.shuffle_choices?' checked':'')+'> Mélanger l’ordre des réponses (différent pour chaque élève)</label><label style="display:block;margin:4px 0"><input type="checkbox" id="qbBack"'+(existing&&existing.allow_back?' checked':'')+'> Autoriser le bouton « Précédent » (retour aux questions déjà vues)</label><label style="display:block;margin:4px 0"><input type="checkbox" id="qbShowCorr"'+(existing&&existing.show_correction_on_finish?' checked':'')+'> Afficher la correction à l’élève dès qu’il a terminé le devoir</label><p class="mu" style="margin:4px 0">Si cette case est décochée, vous pourrez toujours autoriser la correction plus tard. Les scores, eux, ne sont visibles des élèves que lorsque vous les publiez.</p></div>'
   +'<p class="mu">Images : formats JPG, PNG, WebP ou GIF. I2School réduit l’image à 1 200 × 900 pixels maximum et à 500 Ko. Elle s’affichera dans une zone limitée pour ne pas déformer la page.</p>'
@@ -679,6 +679,8 @@ async function showQuizBuilder(quizId=null){
   const btn=document.getElementById('qbSave');btn.disabled=true;
   const args={p_title:title,p_questions:questions,p_coefficient:coefficient,p_scheduled_at:scheduled?new Date(scheduled).toISOString():null,p_due_at:due?new Date(due).toISOString():null};
   const limitRaw=document.getElementById('qbLimit').value.trim(),limit=limitRaw?Math.round(Number(limitRaw)):null;
+  const maxAttempts=Math.round(Number(document.getElementById('qbMaxAttempts').value||1));
+  if(!Number.isFinite(maxAttempts)||maxAttempts<1||maxAttempts>20){btn.disabled=false;return toast('Le nombre de tentatives doit être compris entre 1 et 20.',true)}
   if(limitRaw&&(!Number.isFinite(limit)||limit<1||limit>600)){btn.disabled=false;return toast('La durée doit être comprise entre 1 et 600 minutes.',true)}
   let error,newId=quizId;
   if(existing){const r=await sb.rpc('update_quiz_with_questions',{p_quiz_id:quizId,...args});error=r.error}
@@ -701,6 +703,8 @@ async function showQuizBuilder(quizId=null){
     const lr=await sb.rpc('set_quiz_links',{p_quiz_id:newId,p_assessment_mode:'none',p_assessment_id:null,p_homework:null});
     if(lr.error){btn.disabled=false;return toast('Quiz enregistré, mais la désactivation de son évaluation a échoué : '+lr.error.message,true)}
    }
+   const mr=await sb.rpc('set_quiz_max_attempts',{p_quiz_id:newId,p_max_attempts:maxAttempts});
+   if(mr.error){btn.disabled=false;return toast('Quiz enregistré, mais le nombre de tentatives n’a pas pu être défini : '+mr.error.message,true)}
    const lr=await sb.rpc('set_quiz_options',{p_quiz_id:newId,p_minutes:limit,p_shuffle_questions:document.getElementById('qbShuffleQ').checked,p_shuffle_choices:document.getElementById('qbShuffleC').checked,p_allow_back:document.getElementById('qbBack').checked,p_show_correction_on_finish:document.getElementById('qbShowCorr').checked});
    if(lr.error){btn.disabled=false;return toast('Quiz enregistré, mais les options n’ont pas pu être définies : '+lr.error.message,true)}
   }
@@ -715,18 +719,18 @@ async function learnerQuizzes(){
  const enr=await sb.from('enrollments').select('class_id').eq('student_id',M.student.id).is('withdrawn_at',null).order('enrolled_at',{ascending:false}).limit(1).maybeSingle();
  const classId=enr.data?.class_id;
  if(!classId){box.innerHTML='<div class="card empty">Aucune classe active.</div>';return}
- const{data,error}=await sb.from('quizzes').select('id,title,status,scheduled_at,due_at,time_limit_minutes,correction_released,show_correction_on_finish,scores_published').eq('class_id',classId).in('status',['published','locked']).order('scheduled_at',{ascending:true,nullsFirst:false});
+ const{data,error}=await sb.from('quizzes').select('id,title,status,scheduled_at,due_at,time_limit_minutes,max_attempts,correction_released,show_correction_on_finish,scores_published').eq('class_id',classId).in('status',['published','locked']).order('scheduled_at',{ascending:true,nullsFirst:false});
  if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return}
  if(!data?.length){box.innerHTML='<div class="card empty">Aucun quiz disponible pour le moment.</div>';return}
  const{data:mine}=await sb.rpc('get_my_quiz_attempts',{p_quiz_id:null});
- const byQuiz={};(mine||[]).forEach(a=>byQuiz[a.quiz_id]=a);
+ const byQuiz={};(mine||[]).forEach(a=>(byQuiz[a.quiz_id]=byQuiz[a.quiz_id]||[]).push(a));
  box.innerHTML=data.map(q=>{
-  const a=byQuiz[q.id];const done=a&&a.status==='submitted';
+  const attempts=byQuiz[q.id]||[];const active=attempts.find(a=>a.status==='in_progress');const submitted=attempts.filter(a=>a.status==='submitted');const a=active||submitted[0]||null;const done=!active&&submitted.length>=(q.max_attempts||1);const remaining=Math.max(0,(q.max_attempts||1)-submitted.length);
   const now=Date.now(),future=q.scheduled_at&&now<new Date(q.scheduled_at).getTime(),expired=q.due_at&&now>new Date(q.due_at).getTime();
   const dates='<p class="meta">Programmation : '+esc(q.scheduled_at?new Date(q.scheduled_at).toLocaleString('fr-FR'):'—')+' · Date butoir : '+esc(q.due_at?new Date(q.due_at).toLocaleString('fr-FR'):'—')+(q.time_limit_minutes?' · Durée : '+esc(String(q.time_limit_minutes))+' min':'')+'</p>';
   return'<div class="card"><b>'+esc(q.title)+'</b> <span class="tag">'+esc(q.status)+'</span>'+dates
-   +(done?'<p class="mu">Terminé'+(q.scores_published&&a.score!=null?' — score : '+a.score+'/'+a.max_score:' — votre score sera publié par votre enseignant')+'</p>'+((q.correction_released||q.show_correction_on_finish)?'<button data-review="'+a.id+'">Revoir la correction</button>':'<p class="mu">La correction sera disponible quand votre enseignant l’autorisera.</p>')
-     :'<p class="mu">'+(future?'Disponible à partir de la date programmée.':expired?'Date butoir dépassée.':'Pas encore passé')+'</p><button data-take="'+q.id+'" class="p" '+((future||expired||q.status!=='published')?'disabled':'')+'>Passer le quiz</button>')
+   +(done?'<p class="mu">Terminé'+(q.scores_published&&a.score!=null?' — score : '+a.score+'/'+a.max_score:' — votre score sera publié par votre enseignant')+'</p>'+((q.correction_released||(q.show_correction_on_finish&&a.status==='submitted'))?'<button data-review="'+a.id+'">Revoir la correction</button>':'<p class="mu">La correction sera disponible quand votre enseignant l’autorisera.</p>')
+     :'<p class="mu">'+(active?'Tentative en cours.':future?'Disponible à partir de la date programmée.':expired?'Date butoir dépassée.':'Tentatives utilisées : '+submitted.length+'/'+(q.max_attempts||1)+'. Tentatives restantes : '+remaining)+'</p><button data-take="'+q.id+'" class="p" '+((future||expired||q.status!=='published'||(!active&&remaining<=0))?'disabled':'')+'>'+(active?'Reprendre la tentative':'Passer le quiz')+'</button>')
    +'</div>';
  }).join('');
  box.querySelectorAll('[data-take]').forEach(b=>b.onclick=()=>takeQuiz(b.dataset.take));
@@ -751,7 +755,7 @@ function quizPager(cfg){
    +(q.image_path?'<img src="'+esc(quizImageUrl(q.image_path))+'" alt="Illustration de la question" style="display:block;max-width:100%;max-height:320px;object-fit:contain;margin:8px 0;border-radius:6px">':'')
    +q.choices.map(c=>'<label style="display:block;margin:8px 0;padding:8px 10px;border:1px solid var(--bd,#ddd);border-radius:8px;cursor:pointer"><input type="radio" name="qzpick" value="'+esc(c.id)+'"'+(answers[qid]===c.id?' checked':'')+'> '+esc(c.text)+'</label>').join('')
    +'<div class="bar" style="margin-top:16px">'+(cfg.allowBack&&idx>0?'<button type="button" id="qzPrev">← Précédent</button>':'')+'<button type="button" id="qzNext" class="p">'+(last?'Terminer':'Suivant →')+'</button></div>';
-  stage.querySelectorAll('input[name="qzpick"]').forEach(r=>r.onchange=()=>{answers[qid]=r.value;save()});
+  stage.querySelectorAll('input[name="qzpick"]').forEach(r=>r.onchange=()=>{answers[qid]=r.value;save();if(cfg.onAnswer)cfg.onAnswer(qid,r.value).then(({error})=>{if(error)toast(error.message,true)})});
   const pv=document.getElementById('qzPrev');if(pv)pv.onclick=()=>{idx--;save();draw();window.scrollTo(0,0)};
   document.getElementById('qzNext').onclick=()=>{
    if(!answers[qid]&&!last&&!confirm('Vous n’avez pas répondu à cette question. Passer à la suivante quand même ?'+(cfg.allowBack?'':' Vous ne pourrez pas y revenir.')))return;
@@ -763,7 +767,7 @@ function quizPager(cfg){
 }
 async function previewQuiz(quizId){
  if(M.qzTimer){clearInterval(M.qzTimer);M.qzTimer=null}
- const qr=await sb.from('quizzes').select('id,title,status,time_limit_minutes,shuffle_questions,shuffle_choices,allow_back').eq('id',quizId).single();
+ const qr=await sb.from('quizzes').select('id,title,status,time_limit_minutes,shuffle_questions,shuffle_choices,allow_back,correction_released,show_correction_on_finish').eq('id',quizId).single();
  if(qr.error)return toast(qr.error.message,true);
  const qq=await sb.from('quiz_questions').select('id,position,question_text,image_path').eq('quiz_id',quizId).order('position');
  if(qq.error)return toast(qq.error.message,true);
@@ -791,9 +795,7 @@ async function previewQuiz(quizId){
    const rows=qs.map(([qid,q],i)=>{const good=q.choices.find(c=>c.is_correct),pick=q.choices.find(c=>c.id===ans[qid]),right=!!(good&&pick&&good.id===pick.id);if(right)ok++;
     return '<div style="margin-bottom:10px;padding:8px;border-left:3px solid '+(right?'var(--ac,#1a7f37)':'var(--er,#c00)')+'"><p style="margin:0 0 4px"><b>'+(i+1)+'. '+esc(q.text)+'</b></p><p style="margin:0">Réponse choisie : '+esc(pick?pick.text:'—')+(right?' ✓':' ✗ (bonne réponse : '+esc(good?good.text:'?')+')')+'</p></div>'}).join('');
    const ck=document.getElementById('pvClock');if(ck)ck.style.display='none';
-   document.getElementById('qzStage').innerHTML='<p style="font-size:1.1em"><b>Fin de l’aperçu — score : '+ok+' / '+qs.length+'</b></p><p class="mu">Voici la correction que verrait l’élève une fois que vous l’autorisez.</p>'+rows+'<div class="bar"><button type="button" id="pvAgain" class="p">Recommencer</button>'+(shuf?'<button type="button" id="pvShuffle">🔀 Remélanger et recommencer</button>':'')+'<button type="button" id="pvExit2" class="d">✕ Quitter l’aperçu</button></div>';
-   document.getElementById('pvAgain').onclick=render;
-   const sh=document.getElementById('pvShuffle');if(sh)sh.onclick=()=>{seed=Math.random().toString(36).slice(2);render()};
+   document.getElementById('qzStage').innerHTML='<p style="font-size:1.1em"><b>Fin de l’aperçu — score : '+ok+' / '+qs.length+'</b></p>'+(quiz.correction_released||quiz.show_correction_on_finish?'<p class="mu">Correction autorisée dans les paramètres du quiz.</p>'+rows:'<p class="mu">La correction n’est pas autorisée pour les élèves. Elle ne leur sera pas affichée.</p>')+'<div class="bar"><button type="button" id="pvExit2" class="d">✕ Quitter l’aperçu</button></div>';
    document.getElementById('pvExit2').onclick=exit;
   }});
   pager.start();
@@ -822,18 +824,18 @@ async function takeQuiz(quizId){
  let sending=false;
  const send=async(auto)=>{
   if(sending)return;
-  const answers=pager.collect();
+  const answers=auto?[]:pager.collect();
   if(!auto){const un=answers.filter(a=>!a.choice_id).length;if(!confirm(un?'Il reste '+un+' question(s) sans réponse. Terminer et envoyer quand même ? Vous ne pourrez plus modifier vos réponses.':'Terminer et envoyer vos réponses ? Vous ne pourrez plus les modifier.'))return}
   sending=true;if(M.qzTimer){clearInterval(M.qzTimer);M.qzTimer=null}
   const{data:res,error:se}=await sb.rpc('submit_quiz_attempt',{p_attempt_id:attemptId,p_answers:answers});
   if(se){sending=false;return toast(se.message,true)}
   pager.clear();
-  if(res.late){toast('Temps écoulé : vos réponses n’ont pas pu être enregistrées.',true);learnerQuizzes();return}
+  if(res.late){toast('Temps écoulé : seules les réponses enregistrées avant la fin du temps ont été notées.')}
   toast((auto?'Temps écoulé, réponses envoyées automatiquement. ':'Réponses enregistrées. ')+(res.scores_published&&res.score!=null?'Score : '+res.score+'/'+res.max_score:'Votre score sera publié par votre enseignant.'));
   if(res.show_correction){reviewQuiz(attemptId);return}
   learnerQuizzes();
  };
- const pager=quizPager({qs,allowBack:!!(qinfo.data&&qinfo.data.allow_back),stateKey:'qz_'+attemptId,onFinish:()=>send(false)});
+ const pager=quizPager({qs,allowBack:!!(qinfo.data&&qinfo.data.allow_back),stateKey:'qz_'+attemptId,onAnswer:(qid,cid)=>sb.rpc('save_quiz_attempt_answer',{p_attempt_id:attemptId,p_question_id:qid,p_choice_id:cid}),onFinish:()=>send(false)});
  pager.start();
  if(endAt){
   const tick=()=>{const clock=document.getElementById('qzClock');if(!clock){clearInterval(M.qzTimer);M.qzTimer=null;return}
