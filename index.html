@@ -842,6 +842,7 @@ async function takeQuiz(quizId){
   const answers=auto?[]:pager.collect();
   if(!auto){const un=answers.filter(a=>!a.choice_id).length;if(!confirm(un?'Il reste '+un+' question(s) sans réponse. Terminer et envoyer quand même ? Vous ne pourrez plus modifier vos réponses.':'Terminer et envoyer vos réponses ? Vous ne pourrez plus les modifier.'))return}
   sending=true;if(M.qzTimer){clearInterval(M.qzTimer);M.qzTimer=null}
+  if(auto){const stage=document.getElementById('qzStage');if(stage){stage.style.pointerEvents='none';stage.style.opacity='.55'}}
   const{data:res,error:se}=await sb.rpc('submit_quiz_attempt',{p_attempt_id:attemptId,p_answers:answers});
   if(se){sending=false;return toast(se.message,true)}
   pager.clear();
