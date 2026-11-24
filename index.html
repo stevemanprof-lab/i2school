@@ -534,7 +534,7 @@ async function printSchoolReport(classId,termId){
  const rowHtml=lines.map(l=>'<tr><td class="num">'+safe(l.no)+'</td><td class="id">'+safe(l.mat)+'</td><td class="name">'+safe(l.name)+'</td>'+[0,1,2,3,4,5].map(j=>'<td class="mark">'+mark(tests[j],l.sid)+'</td>').join('')+'<td class="avg">'+(avgBy[l.sid]!=null?safe(money(avgBy[l.sid])):'')+'</td></tr>');
  const pagesHtml=[];
  for(let p=0;p<rowHtml.length;p+=pageSize){
-  pagesHtml.push('<div class="report-page"><table class="lst">'+tableHead+'<tbody>'+rowHtml.slice(p,p+pageSize).join('')+'</tbody></table></div>');
+  pagesHtml.push('<div class="report-page'+(p+pageSize>=rowHtml.length?' last':'')+'"><table class="lst">'+tableHead+'<tbody>'+rowHtml.slice(p,p+pageSize).join('')+'</tbody></table></div>');
  }
  const reportPages=pagesHtml.join('');
  const title='RELEVE DE NOTES DU 1er TRIMESTRE 2026-2027';
@@ -550,7 +550,7 @@ async function printSchoolReport(classId,termId){
  +'.lst th{background:#d9d9d9;border:1px solid #777;font-size:12px;padding:2px;height:6.2mm}.lst th.dim{background:#ececec;color:#8a8a8a}'
  +'.lst td{border:1px solid #777;padding:0 3px;height:5.1mm;line-height:1.1;font-size:10.5px;overflow:hidden}'
  +'.num{width:5%;text-align:center}.id{width:15%;white-space:nowrap}.name{width:30%}.mark{width:7%;text-align:center}.avg{width:8%;text-align:center;font-weight:bold}'
- +'thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}.report-page{break-after:page;page-break-after:always}.report-page:last-child{break-after:auto;page-break-after:auto}';
+ +'thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}.report-page{break-after:page;page-break-after:always}.report-page.last{break-after:auto;page-break-after:auto}';
  win.document.write('<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>'+title+'</title><style>'+css+'</style></head><body>'
  +'<div class="top"><div class="left"><img src="'+LOGO_LYCEE+'" alt=""><div class="tx"><div class="serif"><i>Ministère de l’Education Nationale</i></div><div><b>LYCEE MIKOLONGO</b></div><div><b>Adresse:</b> 412 G1 11377</div><div>lmikolongo@gmail.com Téléphone:</div></div></div>'
  +'<div class="right"><div class="serif" style="font-size:11px">Ministère de l’Education Nationale</div><img src="'+LOGO_ETAT+'" alt=""></div></div>'
