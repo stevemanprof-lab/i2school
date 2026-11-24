@@ -481,11 +481,16 @@ async function printSchoolReport(classId,termId){
  ]);
  if(oe||ae||te||re){toast((oe||ae||te||re).message,true);return}
  const rosterStudents=(roster||[]).map(x=>x.students).filter(Boolean);
- const officialById=new Map((official||[]).map(o=>[o.student_id,o]));
- const officialLines=(official||[]).map(o=>({no:o.roll_no,mat:o.school_matricule,name:o.full_name,sid:o.student_id}));
+ const rosterById=new Map(rosterStudents.map(st=>[st.id,st]));
+ const officialById=new Map((official||[]).filter(o=>o.student_id).map(o=>[o.student_id,o]));
+ const officialLines=(official||[]).map(o=>{
+  const st=rosterById.get(o.student_id);
+  return {no:o.roll_no,mat:o.school_matricule||st?.student_number||'',name:String(o.full_name||'').trim()||((st?.last_name||'')+' '+(st?.first_name||'')).trim(),sid:o.student_id};
+ });
+ let nextNo=Math.max(0,...officialLines.map(l=>Number(l.no)||0));
+ officialLines.forEach(line=>{if(line.no==null){line.no=++nextNo}});
  const missingStudents=rosterStudents.filter(st=>!officialById.has(st.id)).sort((a,b)=>String(a.last_name||'').localeCompare(String(b.last_name||''),'fr')||String(a.first_name||'').localeCompare(String(b.first_name||''),'fr'));
- const nextNo=Math.max(0,...officialLines.map(l=>Number(l.no)||0));
- const lines=officialLines.concat(missingStudents.map((st,i)=>({no:nextNo+i+1,mat:st.student_number||'',name:((st.last_name||'')+' '+(st.first_name||'')).trim(),sid:st.id})));
+ const lines=officialLines.concat(missingStudents.map(st=>({no:++nextNo,mat:st.student_number||'',name:((st.last_name||'')+' '+(st.first_name||'')).trim(),sid:st.id})));
  const tests=assess||[];
  const {data:results,error}=tests.length?await sb.from('assessment_results').select('assessment_id,student_id,score,status').in('assessment_id',tests.map(a=>a.id)): {data:[],error:null};
  if(error){toast(error.message,true);return}
