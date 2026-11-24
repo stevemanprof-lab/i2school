@@ -473,12 +473,27 @@ function reportClassLabel(name){
  return m?(m[1]+' '+rest).trim():n;
 }
 async function printSchoolReport(classId,termId){
- const [{data:official,error:oe},{data:assess,error:ae},{data:term,error:te},{data:roster,error:re}] = await Promise.all([
-  sb.from('official_roster').select('roll_no,school_matricule,full_name,student_id').eq('class_id',classId).order('roll_no',{ascending:true}),
+ const fetchAllPages=async makeQuery=>{
+  const all=[];
+  for(let from=0;;from+=50){
+   const {data,error}=await makeQuery().range(from,from+49);
+   if(error)return {data:null,error};
+   const page=data||[];
+   all.push(...page);
+   if(page.length<50)break;
+  }
+  return {data:all,error:null};
+ };
+ const [officialResult,assessResult,termResult,rosterResult]=await Promise.all([
+  fetchAllPages(()=>sb.from('official_roster').select('roll_no,school_matricule,full_name,student_id').eq('class_id',classId).order('roll_no',{ascending:true})),
   sb.from('assessments').select('id,title,assessment_date,max_score,coefficient,status').eq('class_id',classId).eq('term_id',termId).eq('subject_id',M.english?.id).order('assessment_date',{ascending:true}).order('created_at',{ascending:true}).limit(6),
   sb.from('terms').select('name').eq('id',termId).maybeSingle(),
-  sb.from('enrollments').select('student_id,students(id,first_name,last_name,student_number)').eq('class_id',classId).is('withdrawn_at',null)
+  fetchAllPages(()=>sb.from('enrollments').select('student_id,students(id,first_name,last_name,student_number)').eq('class_id',classId).is('withdrawn_at',null))
  ]);
+ const official=officialResult.data,oe=officialResult.error;
+ const assess=assessResult.data,ae=assessResult.error;
+ const term=termResult.data,te=termResult.error;
+ const roster=rosterResult.data,re=rosterResult.error;
  if(oe||ae||te||re){toast((oe||ae||te||re).message,true);return}
  const rosterStudents=(roster||[]).map(x=>x.students).filter(Boolean);
  const rosterById=new Map(rosterStudents.map(st=>[st.id,st]));
@@ -492,7 +507,8 @@ async function printSchoolReport(classId,termId){
  const missingStudents=rosterStudents.filter(st=>!officialById.has(st.id)).sort((a,b)=>String(a.last_name||'').localeCompare(String(b.last_name||''),'fr')||String(a.first_name||'').localeCompare(String(b.first_name||''),'fr'));
  const lines=officialLines.concat(missingStudents.map(st=>({no:++nextNo,mat:st.student_number||'',name:((st.last_name||'')+' '+(st.first_name||'')).trim(),sid:st.id})));
  const tests=assess||[];
- const {data:results,error}=tests.length?await sb.from('assessment_results').select('assessment_id,student_id,score,status').in('assessment_id',tests.map(a=>a.id)): {data:[],error:null};
+ const resultsResult=tests.length?await fetchAllPages(()=>sb.from('assessment_results').select('assessment_id,student_id,score,status').in('assessment_id',tests.map(a=>a.id))):{data:[],error:null};
+ const results=resultsResult.data,error=resultsResult.error;
  if(error){toast(error.message,true);return}
  const cells={};(results||[]).forEach(r=>cells[r.assessment_id+'|'+r.student_id]=r);
  const avgBy={};
