@@ -473,28 +473,36 @@ function reportClassLabel(name){
  return m?(m[1]+' '+rest).trim():n;
 }
 async function printSchoolReport(classId,termId){
- const [{data:official,error:oe},{data:assess,error:ae},{data:term,error:te},{data:avgs,error:ge}] = await Promise.all([
+ const [{data:official,error:oe},{data:assess,error:ae},{data:term,error:te},{data:roster,error:re}] = await Promise.all([
   sb.from('official_roster').select('roll_no,school_matricule,full_name,student_id').eq('class_id',classId).order('roll_no',{ascending:true}),
-  sb.from('assessments').select('id,title,assessment_date,max_score,status').eq('class_id',classId).eq('term_id',termId).eq('subject_id',M.english?.id).order('assessment_date',{ascending:true}).order('created_at',{ascending:true}).limit(6),
+  sb.from('assessments').select('id,title,assessment_date,max_score,coefficient,status').eq('class_id',classId).eq('term_id',termId).eq('subject_id',M.english?.id).order('assessment_date',{ascending:true}).order('created_at',{ascending:true}).limit(6),
   sb.from('terms').select('name').eq('id',termId).maybeSingle(),
-  sb.from('v_subject_term_averages').select('student_id,moyenne').eq('class_id',classId).eq('term_id',termId).eq('subject_id',M.english?.id)
+  sb.from('enrollments').select('student_id,students(id,first_name,last_name,student_number)').eq('class_id',classId).is('withdrawn_at',null)
  ]);
- if(oe||ae||te||ge){toast((oe||ae||te||ge).message,true);return}
- const avgBy={};(avgs||[]).forEach(a=>avgBy[a.student_id]=a.moyenne);
- let lines;
- if(official&&official.length){
-  lines=official.map(o=>({no:o.roll_no,mat:o.school_matricule,name:o.full_name,sid:o.student_id}));
- }else{
-  const {data:roster,error:re}=await sb.from('enrollments').select('student_id,students(id,first_name,last_name)').eq('class_id',classId).is('withdrawn_at',null);
-  if(re){toast(re.message,true);return}
-  const list=(roster||[]).map(x=>x.students).filter(Boolean).sort((a,b)=>String(a.last_name||'').localeCompare(String(b.last_name||''),'fr'));
-  lines=list.map((s,i)=>({no:i+1,mat:'',name:((s.last_name||'')+' '+(s.first_name||'')).trim(),sid:s.id}));
-  toast('Liste officielle non importée pour cette classe : matricules laissés vides.',true);
- }
+ if(oe||ae||te||re){toast((oe||ae||te||re).message,true);return}
+ const rosterStudents=(roster||[]).map(x=>x.students).filter(Boolean);
+ const officialById=new Map((official||[]).map(o=>[o.student_id,o]));
+ const officialLines=(official||[]).map(o=>({no:o.roll_no,mat:o.school_matricule,name:o.full_name,sid:o.student_id}));
+ const missingStudents=rosterStudents.filter(st=>!officialById.has(st.id)).sort((a,b)=>String(a.last_name||'').localeCompare(String(b.last_name||''),'fr')||String(a.first_name||'').localeCompare(String(b.first_name||''),'fr'));
+ const nextNo=Math.max(0,...officialLines.map(l=>Number(l.no)||0));
+ const lines=officialLines.concat(missingStudents.map((st,i)=>({no:nextNo+i+1,mat:st.student_number||'',name:((st.last_name||'')+' '+(st.first_name||'')).trim(),sid:st.id})));
  const tests=assess||[];
  const {data:results,error}=tests.length?await sb.from('assessment_results').select('assessment_id,student_id,score,status').in('assessment_id',tests.map(a=>a.id)): {data:[],error:null};
  if(error){toast(error.message,true);return}
  const cells={};(results||[]).forEach(r=>cells[r.assessment_id+'|'+r.student_id]=r);
+ const avgBy={};
+ lines.forEach(line=>{
+  let weighted=0,coefs=0;
+  tests.forEach(test=>{
+   const result=cells[test.id+'|'+line.sid];
+   const coefficient=Number(test.coefficient||1);
+   let mark=null;
+   if(result?.status==='present'&&result.score!=null&&Number(test.max_score)>0)mark=Number(result.score)/Number(test.max_score)*20;
+   else if(result?.status==='missing')mark=0;
+   if(mark!=null){weighted+=mark*coefficient;coefs+=coefficient}
+  });
+  avgBy[line.sid]=coefs?Math.round((weighted/coefs)*100)/100:null;
+ });
  const cls=(M.eclasses||[]).find(c=>c.id===classId);
  const teacher=M.teacher||{};
  const teacherName=[teacher.first_name,teacher.last_name].filter(Boolean).join(' ')||'';
